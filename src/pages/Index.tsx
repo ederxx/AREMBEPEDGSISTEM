@@ -5,10 +5,12 @@ import { Car, Bus, Users, MapPin, Phone, Mail, Clock, Shield, Settings } from 'l
 import ServiceCard from '@/components/ServiceCard';
 import QuoteForm from '@/components/QuoteForm';
 import ContactSection from '@/components/ContactSection';
+import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
   const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [selectedService, setSelectedService] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const services = [
     {
@@ -88,7 +90,7 @@ const Index = () => {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => window.location.href = '/auth'}
+                onClick={() => navigate('/auth')}
                 className="border-teal-primary text-teal-primary hover:bg-teal-primary hover:text-white"
               >
                 <Settings className="w-4 h-4 mr-2" />
