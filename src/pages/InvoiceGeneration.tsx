@@ -14,7 +14,7 @@ import { db } from '@/config/firebase';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import logo from "@/assets/logo.png"; // ajuste o caminho para sua logo
+
 
 const InvoiceGeneration = () => {
   const { user } = useAuth();
@@ -80,11 +80,7 @@ const InvoiceGeneration = () => {
 
     const doc = new jsPDF();
 
-    // Adiciona a logo (ajuste o tamanho/posição conforme necessário)
-    const img = new Image();
-    img.src = logo;
-    await new Promise((resolve) => { img.onload = resolve; });
-    doc.addImage(img, "PNG", 80, 10, 50, 20);
+   
 
     // Título
     doc.setFontSize(20);
