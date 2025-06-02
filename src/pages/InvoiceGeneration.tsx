@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,9 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { useToast } from '@/hooks/use-toast';
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import logo from "@/assets/logo.png"; // ajuste o caminho para sua logo
 
 const InvoiceGeneration = () => {
   const { user } = useAuth();
@@ -57,7 +59,7 @@ const InvoiceGeneration = () => {
     }
   };
 
-  const generateInvoice = () => {
+  const generateInvoice = async () => {
     if (selectedServices.length === 0) {
       toast({
         title: "Erro",
@@ -76,10 +78,50 @@ const InvoiceGeneration = () => {
       return;
     }
 
-    // Aqui seria implementada a geração do PDF
+    const doc = new jsPDF();
+
+    // Adiciona a logo (ajuste o tamanho/posição conforme necessário)
+    const img = new Image();
+    img.src = logo;
+    await new Promise((resolve) => { img.onload = resolve; });
+    doc.addImage(img, "PNG", 80, 10, 50, 20);
+
+    // Título
+    doc.setFontSize(20);
+    doc.text("FATURA DE SERVIÇOS", 105, 40, { align: "center" });
+
+    // Dados bancários
+    doc.setFontSize(12);
+    doc.text(`Banco: ${bankData.banco}`, 14, 55);
+    doc.text(`Agência: ${bankData.agencia}`, 14, 62);
+    doc.text(`Conta: ${bankData.conta}`, 14, 69);
+    if (bankData.pix) doc.text(`PIX: ${bankData.pix}`, 14, 76);
+
+    // Tabela de serviços
+    autoTable(doc, {
+      startY: 85,
+      head: [["Empresa", "Data", "Valor"]],
+      body: selectedServicesData.map(s => [
+        s.nomeEmpresa,
+        formatDate(s.dataInicio),
+        formatCurrency(s.valorFinal || 0)
+      ]),
+      theme: "grid",
+      headStyles: { fillColor: [13, 148, 136] },
+      styles: { fontSize: 11 }
+    });
+
+    // Total
+    const finalY = doc.lastAutoTable.finalY || 100;
+    doc.setFontSize(14);
+    doc.text(`Total: ${formatCurrency(totalValue)}`, 14, finalY + 15);
+
+    // Salvar PDF
+    doc.save(`fatura-${new Date().toISOString().slice(0,10)}.pdf`);
+
     toast({
       title: "Sucesso",
-      description: "Fatura gerada com sucesso! (Funcionalidade de PDF será implementada)",
+      description: "Fatura PDF gerada com sucesso!",
     });
   };
 
