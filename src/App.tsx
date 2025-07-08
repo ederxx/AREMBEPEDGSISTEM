@@ -14,6 +14,7 @@ import ServicesManagement from "./pages/ServicesManagement";
 import FleetManagement from "./pages/FleetManagement";
 import DriversManagement from "./pages/DriversManagement";
 import InvoiceGeneration from "./pages/InvoiceGeneration";
+import Expenses from "./pages/Expense";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/expenses" element={<Expenses />} />
             <Route path="/quotes" element={<QuotesManagement />} />
             <Route path="/services" element={<ServicesManagement />} />
             <Route path="/fleet" element={<FleetManagement />} />

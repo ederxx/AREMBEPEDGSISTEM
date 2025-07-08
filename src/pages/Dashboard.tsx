@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -17,18 +18,36 @@ interface Quote {
 interface Vehicle {
   id: string;
   status?: string;
+  placa?: string;
+  modelo?: string;
+  tipo?: string;
+  licencaVencimento?: string;
   [key: string]: unknown;
 }
 
 interface Driver {
   id: string;
+  nome?: string;
+  name?: string;
   [key: string]: unknown;
 }
 
 interface Service {
   id: string;
   date?: string;
-  [key: string]:unknown;
+  dataInicio?: string;
+  nomeEmpresa?: string;
+  tipoCarro?: string;
+  [key: string]: unknown;
+}
+
+interface Expense {
+  id: string;
+  valor: number;
+  status: string;
+  dataVencimento: string;
+  nome?: string;
+  [key: string]: unknown;
 }
 
 const Dashboard = () => {
@@ -37,7 +56,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
+      navigate('/');
     }
   }, [user, navigate]);
 
@@ -78,6 +97,32 @@ const Dashboard = () => {
     }
   });
 
+  // Despesas
+  const { data: expenses } = useQuery({
+    queryKey: ['expenses'],
+    queryFn: async (): Promise<Expense[]> => {
+      const snapshot = await getDocs(collection(db, 'expenses'));
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        const hoje = new Date();
+        const vencimento = new Date(data.dataVencimento);
+        
+        let status = 'pendente';
+        if (data.dataPagamento) {
+          status = 'pago';
+        } else if (vencimento < hoje) {
+          status = 'vencido';
+        }
+
+        return {
+          id: doc.id,
+          ...data,
+          status
+        } as Expense;
+      });
+    }
+  });
+
   const handleLogout = async () => {
     await logout();
     navigate('/');
@@ -106,15 +151,18 @@ const Dashboard = () => {
   // Veículos com licença vencendo em até 60 dias
   const vehiclesExpiring = (vehicles || []).filter(v => {
     if (!v.licencaVencimento) return false;
-    const licDate = new Date(v.licencaVencimento as string);
+    const licDate = new Date(v.licencaVencimento);
     const diff = (licDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
     return diff > 0 && diff <= 60;
   });
 
-  // Outros dados
+  // Dados de despesas
   const pendingQuotes = quotes?.filter(q => q.status === 'pendente') || [];
   const activeVehicles = vehicles?.filter(v => v.status === 'ativo') || [];
   const totalDrivers = drivers || [];
+  const pendingExpenses = expenses?.filter(e => e.status === 'pendente') || [];
+  const overdueExpenses = expenses?.filter(e => e.status === 'vencido') || [];
+  const totalExpensesValue = expenses?.reduce((sum, e) => sum + e.valor, 0) || 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -174,6 +222,39 @@ const Dashboard = () => {
               <div className="text-2xl font-bold">{totalDrivers.length}</div>
             </CardContent>
           </Card>
+
+          {/* Novos Cards de Despesas */}
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Despesas</CardTitle>
+              <DollarSign className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                R$ {totalExpensesValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Despesas Pendentes</CardTitle>
+              <FileText className="h-4 w-4 text-yellow-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">{pendingExpenses.length}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Despesas Vencidas</CardTitle>
+              <AlertCircle className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{overdueExpenses.length}</div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">
@@ -193,6 +274,10 @@ const Dashboard = () => {
                 <Calendar className="w-4 h-4 mr-2" />
                 Serviços Realizados
               </Button>
+              <Button className="w-full justify-start" onClick={() => navigate('/expenses')}>
+                <DollarSign className="w-4 h-4 mr-2" />
+                Gerenciar Despesas
+              </Button>
               <Button className="w-full justify-start" onClick={() => navigate('/invoices')}>
                 <DollarSign className="w-4 h-4 mr-2" />
                 Gerar Faturas
@@ -208,17 +293,30 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {vehiclesExpiring.length === 0 && upcomingServices.length === 0 ? (
+              {vehiclesExpiring.length === 0 && upcomingServices.length === 0 && overdueExpenses.length === 0 ? (
                 <p className="text-gray-500">Nenhum alerta no momento.</p>
               ) : (
                 <div className="space-y-2">
+                  {overdueExpenses.length > 0 && (
+                    <div>
+                      <strong className="text-red-600">Despesas vencidas ({overdueExpenses.length}):</strong>
+                      <ul className="list-disc ml-5">
+                        {overdueExpenses.slice(0, 3).map(expense => (
+                          <li key={expense.id} className="text-red-600">
+                            {expense.nome || 'Despesa'} - R$ {expense.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </li>
+                        ))}
+                        {overdueExpenses.length > 3 && <li className="text-red-600">... e mais {overdueExpenses.length - 3}</li>}
+                      </ul>
+                    </div>
+                  )}
                   {vehiclesExpiring.length > 0 && (
                     <div>
                       <strong>Veículos com licença vencendo em até 60 dias:</strong>
                       <ul className="list-disc ml-5">
                         {vehiclesExpiring.map(v => (
                           <li key={v.id}>
-                            {v.modelo || v.tipo || 'Veículo'} - Placa: {v.placa} - Vence em: {new Date(String(v.licencaVencimento)).toLocaleDateString('pt-BR')}
+                            {v.modelo || v.tipo || 'Veículo'} - Placa: {v.placa} - Vence em: {new Date(v.licencaVencimento!).toLocaleDateString('pt-BR')}
                           </li>
                         ))}
                       </ul>
@@ -230,7 +328,7 @@ const Dashboard = () => {
                       <ul className="list-disc ml-5">
                         {upcomingServices.map(s => (
                           <li key={s.id}>
-                            {s.nomeEmpresa || s.tipoCarro || 'Serviço'} - Data: {new Date(s.dataInicio || s.date).toLocaleDateString('pt-BR')}
+                            {s.nomeEmpresa || s.tipoCarro || 'Serviço'} - Data: {new Date(s.dataInicio || s.date!).toLocaleDateString('pt-BR')}
                           </li>
                         ))}
                       </ul>
