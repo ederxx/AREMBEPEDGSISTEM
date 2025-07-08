@@ -14,7 +14,6 @@ import ExpenseForm from '@/components/expenses/ExpenseForm';
 import ExpensesList from '@/components/ExpensesList';
 import ExpenseCharts from '@/components/ExpenseCharts';
 import ExpenseReports from '@/components/expenses/ExpenseReports';
-import DebugCard from '@/components/expenses/DebugCard';
 import { Expense } from '@/types/expense';
 
 const Expenses = () => {
@@ -203,7 +202,6 @@ const Expenses = () => {
 
       <main className="container mx-auto px-4 py-8">
         {/* Debug Card para status da conexão */}
-        <DebugCard />
         
         {/* Cards de Resumo */}
         <ExpenseSummary expenses={expenses || []} />
