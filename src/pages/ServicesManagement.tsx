@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -32,9 +31,31 @@ const ServicesManagement = () => {
     localSaida: '',
     localDestino: '',
     valorFinal: '',
-    faturado: false,
+    status: 'pendente',
     observacoes: ''
   });
+
+  // Funções para formatar status e definir cor do Badge
+  const formatStatus = (status?: string) => {
+    if (!status) return 'Sem status';
+    return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
+  };
+
+  const getBadgeClass = (status: string) => {
+    switch (status) {
+      case 'faturado':
+        return 'bg-green-500 hover:bg-green-600';
+      case 'finalizado':
+        return 'bg-blue-500 hover:bg-blue-600';
+      case 'em_andamento':
+        return 'bg-yellow-500 hover:bg-yellow-600 text-black';
+      case 'cancelado':
+        return 'bg-red-500 hover:bg-red-600';
+      case 'pendente':
+      default:
+        return 'bg-gray-500 hover:bg-gray-600';
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -46,7 +67,14 @@ const ServicesManagement = () => {
     queryKey: ['services'],
     queryFn: async () => {
       const snapshot = await getDocs(collection(db, 'services'));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          status: data.status || 'pendente' // garante que o status sempre tenha um valor
+        };
+      });
     }
   });
 
@@ -146,16 +174,21 @@ const ServicesManagement = () => {
       localSaida: '',
       localDestino: '',
       valorFinal: '',
-      faturado: false,
+      status: 'pendente',
       observacoes: ''
     });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.nomeEmpresa.trim() || !formData.dataInicio || !formData.tipoCarro || 
-        !formData.numeroPassageiros || !formData.valorFinal) {
+
+    if (
+      !formData.nomeEmpresa.trim() ||
+      !formData.dataInicio ||
+      !formData.tipoCarro ||
+      !formData.numeroPassageiros ||
+      !formData.valorFinal
+    ) {
       toast({
         title: "Erro",
         description: "Por favor, preencha todos os campos obrigatórios.",
@@ -182,7 +215,7 @@ const ServicesManagement = () => {
       localSaida: service.localSaida || '',
       localDestino: service.localDestino || '',
       valorFinal: service.valorFinal?.toString() || '',
-      faturado: service.faturado || false,
+      status: service.status || 'pendente',
       observacoes: service.observacoes || ''
     });
     setShowForm(true);
@@ -203,11 +236,8 @@ const ServicesManagement = () => {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
-    try {
-      return new Date(dateString).toLocaleDateString('pt-BR');
-    } catch {
-      return dateString;
-    }
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
   };
 
   if (!user) return null;
@@ -270,7 +300,10 @@ const ServicesManagement = () => {
                 </div>
                 <div>
                   <Label htmlFor="tipoCarro">Tipo de Carro *</Label>
-                  <Select value={formData.tipoCarro} onValueChange={(value) => setFormData({ ...formData, tipoCarro: value })}>
+                  <Select
+                    value={formData.tipoCarro}
+                    onValueChange={(value) => setFormData({ ...formData, tipoCarro: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o veículo" />
                     </SelectTrigger>
@@ -307,6 +340,24 @@ const ServicesManagement = () => {
                   />
                 </div>
                 <div>
+                  <Label htmlFor="status">Status do Serviço</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="em_andamento">Em andamento</SelectItem>
+                      <SelectItem value="finalizado">Finalizado</SelectItem>
+                      <SelectItem value="faturado">Faturado</SelectItem>
+                      <SelectItem value="cancelado">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label htmlFor="localSaida">Local de Saída</Label>
                   <Input
                     id="localSaida"
@@ -322,14 +373,6 @@ const ServicesManagement = () => {
                     onChange={(e) => setFormData({ ...formData, localDestino: e.target.value })}
                   />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="faturado"
-                    checked={formData.faturado}
-                    onCheckedChange={(checked) => setFormData({ ...formData, faturado: !!checked })}
-                  />
-                  <Label htmlFor="faturado">Faturado</Label>
-                </div>
                 <div className="md:col-span-2 lg:col-span-3">
                   <Label htmlFor="observacoes">Observações</Label>
                   <Input
@@ -340,12 +383,15 @@ const ServicesManagement = () => {
                   />
                 </div>
                 <div className="md:col-span-2 lg:col-span-3 flex space-x-4">
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={addServiceMutation.isPending || updateServiceMutation.isPending}
                   >
-                    {addServiceMutation.isPending || updateServiceMutation.isPending ? 'Salvando...' : 
-                     editingService ? 'Atualizar Serviço' : 'Registrar Serviço'}
+                    {addServiceMutation.isPending || updateServiceMutation.isPending
+                      ? 'Salvando...'
+                      : editingService
+                      ? 'Atualizar Serviço'
+                      : 'Registrar Serviço'}
                   </Button>
                   <Button type="button" variant="outline" onClick={handleCancel}>
                     Cancelar
@@ -396,20 +442,19 @@ const ServicesManagement = () => {
                         <TableCell>{service.numeroPassageiros}</TableCell>
                         <TableCell>{formatCurrency(service.valorFinal || 0)}</TableCell>
                         <TableCell>
-                          {service.faturado ? (
-                            <Badge className="bg-green-500 hover:bg-green-600">Faturado</Badge>
-                          ) : (
-                            <Badge variant="secondary">Pendente</Badge>
-                          )}
+                          <Badge className={getBadgeClass(service.status)}>
+                            {formatStatus(service.status)}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
                             <Button size="sm" variant="outline" onClick={() => handleEdit(service)}>
                               <Edit className="w-4 h-4" />
+                           
                             </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
+                            <Button
+                              size="sm"
+                              variant="outline"
                               onClick={() => deleteServiceMutation.mutate(service.id)}
                               disabled={deleteServiceMutation.isPending}
                             >

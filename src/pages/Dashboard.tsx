@@ -43,6 +43,7 @@ interface Service {
   dataInicio?: string;
   nomeEmpresa?: string;
   tipoCarro?: string;
+  localDestino?:string;
   [key: string]: unknown;
 }
 
@@ -378,6 +379,18 @@ const Dashboard = () => {
                           </li>
                         ))}
                         {overdueExpenses.length > 3 && <li>... e mais {overdueExpenses.length - 3}</li>}
+                      </ul>
+                    </div>
+                  )} {/* Servicos proximos*/}
+                  {todayServices.length > 0 && (
+                    <div>
+                      <strong className="text-yellow-700">Servicos proximos ({todayServices.length}):</strong>
+                      <ul className="list-disc ml-5 text-yellow-700">
+                        {todayServices.map(s => (
+                          <li key={s.id}>
+                            {s.dataInicio || s.tipoCarro || 'Veículo'} - Destino: {s.localDestino} 
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   )}
