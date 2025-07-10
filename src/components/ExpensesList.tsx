@@ -39,6 +39,7 @@ import { db } from '@/config/firebase';
 import { toast } from '@/hooks/use-toast';
 import { Expense } from '@/types/expense';
 import { CATEGORY_NAMES } from '@/constants/expenseCategories';
+import { EditExpenseModal } from '@/components/EditExpenseModal';
 
 interface ExpensesListProps {
   expenses: Expense[];
@@ -55,8 +56,9 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
   const [editingExpense, setEditingExpense] = useState<string | null>(null);
   const [paymentDate, setPaymentDate] = useState<Date | undefined>(undefined);
   const [usersMap, setUsersMap] = useState<Record<string, UserInfo>>({});
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
 
-  // Função para calcular o status da despesa
   const calculateStatus = (
     expense: Expense
   ): 'pago' | 'pendente' | 'vencido' => {
@@ -66,22 +68,12 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
       ? new Date(expense.dataPagamento)
       : null;
 
-    if (pagamento && pagamento <= hoje) {
-      return 'pago';
-    }
-
-    if (vencimento > hoje && (!pagamento || pagamento > hoje)) {
-      return 'pendente';
-    }
-
-    if (vencimento < hoje && (!pagamento || pagamento > hoje)) {
-      return 'vencido';
-    }
-
+    if (pagamento && pagamento <= hoje) return 'pago';
+    if (vencimento > hoje && (!pagamento || pagamento > hoje)) return 'pendente';
+    if (vencimento < hoje && (!pagamento || pagamento > hoje)) return 'vencido';
     return 'pendente';
   };
 
-  // Busca usuários pelo userId das despesas
   useEffect(() => {
     const userIds = Array.from(
       new Set(expenses.map((e) => e.userId).filter(Boolean))
@@ -117,7 +109,6 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
     fetchUsers();
   }, [expenses]);
 
-  // Mutation para marcar como pago
   const markAsPaidMutation = useMutation({
     mutationFn: async ({
       id,
@@ -140,7 +131,6 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
     },
   });
 
-  // Mutation para excluir despesa
   const deleteExpenseMutation = useMutation({
     mutationFn: async (id: string) => {
       await deleteDoc(doc(db, 'expenses', id));
@@ -151,6 +141,22 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
     },
     onError: () => {
       toast({ title: 'Erro ao excluir despesa', variant: 'destructive' });
+    },
+  });
+
+  const editExpenseMutation = useMutation({
+    mutationFn: async (updated: Partial<Expense> & { id: string }) => {
+      const expenseRef = doc(db, 'expenses', updated.id);
+      await updateDoc(expenseRef, updated);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast({ title: 'Despesa atualizada com sucesso!' });
+      setIsEditModalOpen(false);
+      setExpenseToEdit(null);
+    },
+    onError: () => {
+      toast({ title: 'Erro ao atualizar despesa', variant: 'destructive' });
     },
   });
 
@@ -168,17 +174,11 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pago':
-        return (
-          <Badge className="bg-green-100 text-green-800">Pago</Badge>
-        );
+        return <Badge className="bg-green-100 text-green-800">Pago</Badge>;
       case 'pendente':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800">Pendente</Badge>
-        );
+        return <Badge className="bg-yellow-100 text-yellow-800">Pendente</Badge>;
       case 'vencido':
-        return (
-          <Badge className="bg-red-100 text-red-800">Vencido</Badge>
-        );
+        return <Badge className="bg-red-100 text-red-800">Vencido</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
@@ -187,34 +187,24 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pago':
-        return (
-          <DollarSign className="w-4 h-4 text-green-600" />
-        );
+        return <DollarSign className="w-4 h-4 text-green-600" />;
       case 'pendente':
-        return (
-          <FileText className="w-4 h-4 text-yellow-600" />
-        );
+        return <FileText className="w-4 h-4 text-yellow-600" />;
       case 'vencido':
-        return (
-          <AlertCircle className="w-4 h-4 text-red-600" />
-        );
+        return <AlertCircle className="w-4 h-4 text-red-600" />;
       default:
         return null;
     }
   };
 
   const sortedExpenses = [...expenses].sort(
-    (a, b) =>
-      new Date(a.dataVencimento).getTime() -
-      new Date(b.dataVencimento).getTime()
+    (a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime()
   );
 
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="p-6 text-center">
-          Carregando despesas...
-        </CardContent>
+        <CardContent className="p-6 text-center">Carregando despesas...</CardContent>
       </Card>
     );
   }
@@ -224,8 +214,7 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
       <Card>
         <CardHeader>
           <CardTitle>
-            Lista de Despesas ({sortedExpenses.length}{' '}
-            {sortedExpenses.length === 1 ? 'item' : 'itens'})
+            Lista de Despesas ({sortedExpenses.length} {sortedExpenses.length === 1 ? 'item' : 'itens'})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -240,7 +229,7 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
                   <TableHead>Vencimento</TableHead>
                   <TableHead>Pagamento</TableHead>
                   <TableHead>Valor</TableHead>
-                  <TableHead>Usuário</TableHead> {/* Coluna Usuário */}
+                  <TableHead>Usuário</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -259,90 +248,42 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
                         </div>
                       </TableCell>
                       <TableCell className="font-medium">{expense.nome}</TableCell>
-                      <TableCell>
-                        {CATEGORY_NAMES[
-                          expense.categoria as keyof typeof CATEGORY_NAMES
-                        ]}
-                      </TableCell>
+                      <TableCell>{CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES]}</TableCell>
                       <TableCell>{expense.subcategoria}</TableCell>
-                      <TableCell>
-                        {new Date(expense.dataVencimento).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell>
-                        {expense.dataPagamento
-                          ? new Date(expense.dataPagamento).toLocaleDateString('pt-BR')
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        R${' '}
-                        {expense.valor.toLocaleString('pt-BR', {
-                          minimumFractionDigits: 2,
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        {usersMap[expense.userId]?.name || 'Desconhecido'}
-                      </TableCell>
+                      <TableCell>{new Date(expense.dataVencimento).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell>{expense.dataPagamento ? new Date(expense.dataPagamento).toLocaleDateString('pt-BR') : '-'}</TableCell>
+                      <TableCell className="font-medium">R$ {expense.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell>{usersMap[expense.userId]?.name || 'Desconhecido'}</TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
                           {status !== 'pago' && (
-                            <>
-                              {editingExpense === expense.id ? (
-                                <div className="flex items-center space-x-2">
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button variant="outline" size="sm">
-                                        <CalendarIcon className="w-4 h-4" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent
-                                      className="w-auto p-0"
-                                      align="start"
-                                    >
-                                      <Calendar
-                                        mode="single"
-                                        selected={paymentDate}
-                                        onSelect={setPaymentDate}
-                                        initialFocus
-                                        className="p-3 pointer-events-auto"
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleMarkAsPaid(expense.id)}
-                                    disabled={markAsPaidMutation.isPending}
-                                  >
-                                    Confirmar
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setEditingExpense(null);
-                                      setPaymentDate(undefined);
-                                    }}
-                                  >
-                                    Cancelar
-                                  </Button>
-                                </div>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  onClick={() => setEditingExpense(expense.id)}
-                                >
-                                  Marcar como pago
-                                </Button>
-                              )}
-                            </>
+                            editingExpense === expense.id ? (
+                              <div className="flex items-center space-x-2">
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                      <CalendarIcon className="w-4 h-4" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={paymentDate}
+                                      onSelect={setPaymentDate}
+                                      initialFocus
+                                      className="p-3 pointer-events-auto"
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                                <Button size="sm" onClick={() => handleMarkAsPaid(expense.id)} disabled={markAsPaidMutation.isPending}>Confirmar</Button>
+                                <Button variant="outline" size="sm" onClick={() => { setEditingExpense(null); setPaymentDate(undefined); }}>Cancelar</Button>
+                              </div>
+                            ) : (
+                              <Button size="sm" onClick={() => setEditingExpense(expense.id)}>Marcar como pago</Button>
+                            )
                           )}
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => deleteExpenseMutation.mutate(expense.id)}
-                            disabled={deleteExpenseMutation.isLoading}
-                          >
-                            Excluir
-                          </Button>
+                          <Button variant="secondary" size="sm" onClick={() => { setExpenseToEdit(expense); setIsEditModalOpen(true); }}>Editar</Button>
+                          <Button variant="destructive" size="sm" onClick={() => deleteExpenseMutation.mutate(expense.id)} disabled={deleteExpenseMutation.isLoading}>Excluir</Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -353,6 +294,13 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
           </div>
         </CardContent>
       </Card>
+
+      <EditExpenseModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={(updated) => editExpenseMutation.mutate({ ...updated, id: expenseToEdit!.id })}
+        expense={expenseToEdit}
+      />
     </div>
   );
 };

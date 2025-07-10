@@ -51,6 +51,7 @@ interface Expense {
   valor: number;
   status: string;
   dataVencimento: string;
+  dataPagamento?: string;
   nome?: string;
   [key: string]: unknown;
 }
@@ -99,6 +100,7 @@ const Dashboard = () => {
     }
   });
 
+  // Aqui a correção importante para o status das despesas:
   const { data: expenses } = useQuery({
     queryKey: ['expenses'],
     queryFn: async (): Promise<Expense[]> => {
@@ -107,18 +109,22 @@ const Dashboard = () => {
         const data = doc.data();
         const hoje = new Date();
         const vencimento = parseISO(data.dataVencimento);
+        const pagamento = data.dataPagamento ? parseISO(data.dataPagamento) : null;
 
-        let status = 'pendente';
-        if (data.dataPagamento) {
+        let status: 'pendente' | 'pago' | 'vencido' = 'pendente';
+
+        if (pagamento && pagamento <= hoje) {
           status = 'pago';
-        } else if (vencimento < hoje) {
+        } else if (vencimento < hoje && (!pagamento || (pagamento && pagamento > hoje))) {
           status = 'vencido';
+        } else {
+          status = 'pendente';
         }
 
         return {
           id: doc.id,
           ...data,
-          status
+          status,
         } as Expense;
       });
     }
@@ -151,30 +157,31 @@ const Dashboard = () => {
     return date > now && date <= in15Days;
   });
 
-  // Veículos com licença de turismo  vencendo em até 60 dias
+  // Veículos com licença de turismo vencendo em até 60 dias
   const in60Days = new Date(now);
   in60Days.setDate(now.getDate() + 60);
   const vehiclesExpiring = (vehicles || []).filter(v => {
-    if (!v.dataTurismo|| typeof v.dataTurismo !== 'string') return false;
+    if (!v.dataTurismo || typeof v.dataTurismo !== 'string') return false;
     const licDate = parseISO(v.dataTurismo);
     return licDate > now && licDate <= in60Days;
   });
-    // Veículos com licença  de turismo vencida
-    const vehiclesCNHExpired = (vehicles|| []).filter(v => {
+
+  // Veículos com licença de turismo vencida
+  const vehiclesCNHExpired = (vehicles || []).filter(v => {
     if (!v.dataTurismo) return false;
     const validade = parseISO(v.dataTurismo);
     return validade < now;
   });
-    // Veículos com licença de fretamento  vencendo em até 60 dias
 
-  in60Days.setDate(now.getDate() + 60);
+  // Veículos com licença de fretamento vencendo em até 60 dias
   const vehiclesfretExpiring = (vehicles || []).filter(v => {
-    if (!v.dataFretamento|| typeof v.dataFretamento !== 'string') return false;
+    if (!v.dataFretamento || typeof v.dataFretamento !== 'string') return false;
     const licDate = parseISO(v.dataFretamento);
     return licDate > now && licDate <= in60Days;
   });
-    // Veículos com licença  de fretamento vencida
-    const vehiclesfretCNHExpired = (vehicles|| []).filter(v => {
+
+  // Veículos com licença de fretamento vencida
+  const vehiclesfretCNHExpired = (vehicles || []).filter(v => {
     if (!v.dataFretamento) return false;
     const validade = parseISO(v.dataFretamento);
     return validade < now;
@@ -375,11 +382,11 @@ const Dashboard = () => {
                     </div>
                   )}
 
-                  {/* Veículos licença  turismo vencendo */}
+                  {/* Veículos licença turismo vencendo */}
                   {vehiclesExpiring.length > 0 && (
                     <div>
                       <strong className="text-yellow-700">Veículos com licença de Turismo vencendo em até 60 dias ({vehiclesExpiring.length}):</strong>
-                    <ul className="list-disc ml-5 text-yellow-700">
+                      <ul className="list-disc ml-5 text-yellow-700">
                         {vehiclesExpiring.map(v => (
                           <li key={v.id}>
                             {v.modelo || v.tipo || 'Veículo'} - Placa: {v.placa} - Vence em: {new Date(v.dataTurismo!).toLocaleDateString('pt-BR')}
@@ -388,24 +395,27 @@ const Dashboard = () => {
                       </ul>
                     </div>
                   )}
-                   {/*  Veículos licença turismo expiradas */}
+
+                  {/* Veículos licença turismo expiradas */}
                   {vehiclesCNHExpired.length > 0 && (
                     <div>
                       <strong className="text-red-700">Veículos com licença de Turismo vencidas ({vehiclesCNHExpired.length}):</strong>
                       <ul className="list-disc ml-5 text-red-700">
                         {vehiclesCNHExpired.slice(0, 3).map(v => (
                           <li key={v.id}>
-                            {v.modelo  || v.tipo|| 'Veículo'} - Placa: {v.placa} - Vencida {v.placa} {new Date(v.dataTurismo).toLocaleDateString('pt-BR')}
+                            {v.modelo  || v.tipo|| 'Veículo'} - Placa: {v.placa} - Vencida em {new Date(v.dataTurismo).toLocaleDateString('pt-BR')}
                           </li>
                         ))}
                         {vehiclesCNHExpired.length > 3 && <li>... e mais {vehiclesCNHExpired.length - 3}</li>}
                       </ul>
                     </div>
-                  )}  {/* Veículos licença  fretamento vencendo */}
+                  )}
+
+                  {/* Veículos licença fretamento vencendo */}
                   {vehiclesfretExpiring.length > 0 && (
                     <div>
                       <strong className="text-yellow-700">Veículos com licença de Fretamento vencendo em até 60 dias ({vehiclesfretExpiring.length}):</strong>
-                    <ul className="list-disc ml-5 text-yellow-700">
+                      <ul className="list-disc ml-5 text-yellow-700">
                         {vehiclesfretExpiring.map(v => (
                           <li key={v.id}>
                             {v.modelo || v.tipo || 'Veículo'} - Placa: {v.placa} - Vence em: {new Date(v.dataFretamento!).toLocaleDateString('pt-BR')}
@@ -414,14 +424,15 @@ const Dashboard = () => {
                       </ul>
                     </div>
                   )}
-                   {/*  Veículos licença fretamento expiradas */}
+
+                  {/* Veículos licença fretamento expiradas */}
                   {vehiclesfretCNHExpired.length > 0 && (
                     <div>
                       <strong className="text-red-700">Veículos com licença de Fretamento vencidas ({vehiclesfretCNHExpired.length}):</strong>
                       <ul className="list-disc ml-5 text-red-700">
                         {vehiclesfretCNHExpired.slice(0, 3).map(v => (
                           <li key={v.id}>
-                            {v.modelo  || v.tipo|| 'Veículo'} - Placa: {v.placa} - Vencida {v.placa} {new Date(v.dataFretamento).toLocaleDateString('pt-BR')}
+                            {v.modelo || v.tipo || 'Veículo'} - Placa: {v.placa} - Vencida em {new Date(v.dataFretamento).toLocaleDateString('pt-BR')}
                           </li>
                         ))}
                         {vehiclesfretCNHExpired.length > 3 && <li>... e mais {vehiclesfretCNHExpired.length - 3}</li>}
@@ -429,44 +440,28 @@ const Dashboard = () => {
                     </div>
                   )}
 
-
-                  {/* Serviços próximos 15 dias */}
-                  {upcomingServices.length > 0 && (
-                    <div>
-                      <strong>Serviços nos próximos 15 dias ({upcomingServices.length}):</strong>
-                      <ul className="list-disc ml-5">
-                        {upcomingServices.map(s => (
-                          <li key={s.id}>
-                            {s.nomeEmpresa || s.tipoCarro || 'Serviço'} - Data: {new Date(s.dataInicio || s.date!).toLocaleDateString('pt-BR')}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Motoristas CNH expirando */}
+                  {/* Motoristas CNH vencendo */}
                   {driversCNHExpiring.length > 0 && (
                     <div>
-                      <strong className="text-yellow-700">CNHs vencendo em até 60 dias ({driversCNHExpiring.length}):</strong>
+                      <strong className="text-yellow-700">Motoristas com CNH vencendo em até 60 dias ({driversCNHExpiring.length}):</strong>
                       <ul className="list-disc ml-5 text-yellow-700">
-                        {driversCNHExpiring.slice(0, 3).map(d => (
+                        {driversCNHExpiring.map(d => (
                           <li key={d.id}>
-                            {d.nomeCompleto || d.name || 'Motorista'} - Validade CNH: {new Date(d.cnhValidade).toLocaleDateString('pt-BR')}
+                            {d.nomeCompleto || d.name || 'Motorista'} - Vence em: {new Date(d.cnhValidade!).toLocaleDateString('pt-BR')}
                           </li>
                         ))}
-                        {driversCNHExpiring.length > 3 && <li>... e mais {driversCNHExpiring.length - 3}</li>}
                       </ul>
                     </div>
                   )}
 
-                  {/* Motoristas CNH expiradas */}
+                  {/* Motoristas CNH vencidas */}
                   {driversCNHExpired.length > 0 && (
                     <div>
-                      <strong className="text-red-700">CNHs vencidas ({driversCNHExpired.length}):</strong>
+                      <strong className="text-red-700">Motoristas com CNH vencidas ({driversCNHExpired.length}):</strong>
                       <ul className="list-disc ml-5 text-red-700">
                         {driversCNHExpired.slice(0, 3).map(d => (
                           <li key={d.id}>
-                            {d.nomeCompleto || d.name || 'Motorista'} -  Validade CNH: {new Date(d.cnhValidade).toLocaleDateString('pt-BR')}
+                            {d.nomeCompleto || d.name || 'Motorista'} - Vencida em {new Date(d.cnhValidade).toLocaleDateString('pt-BR')}
                           </li>
                         ))}
                         {driversCNHExpired.length > 3 && <li>... e mais {driversCNHExpired.length - 3}</li>}
@@ -474,29 +469,28 @@ const Dashboard = () => {
                     </div>
                   )}
 
-                  {/* Motoristas Curso expirando */}
+                  {/* Motoristas Curso vencendo */}
                   {driversCursoExpiring.length > 0 && (
                     <div>
-                      <strong className="text-yellow-700">Cursos vencendo em até 60 dias ({driversCursoExpiring.length}):</strong>
+                      <strong className="text-yellow-700">Motoristas com curso vencendo em até 60 dias ({driversCursoExpiring.length}):</strong>
                       <ul className="list-disc ml-5 text-yellow-700">
-                        {driversCursoExpiring.slice(0, 3).map(d => (
+                        {driversCursoExpiring.map(d => (
                           <li key={d.id}>
-                            {d.nomeCompleto|| d.name || 'Motorista'} - Validade Curso: {new Date(d.cursoValidade).toLocaleDateString('pt-BR')}
+                            {d.nomeCompleto || d.name || 'Motorista'} - Vence em: {new Date(d.cursoValidade!).toLocaleDateString('pt-BR')}
                           </li>
                         ))}
-                        {driversCursoExpiring.length > 3 && <li>... e mais {driversCursoExpiring.length - 3}</li>}
                       </ul>
                     </div>
                   )}
 
-                  {/* Motoristas Curso expirados */}
+                  {/* Motoristas Curso vencidas */}
                   {driversCursoExpired.length > 0 && (
                     <div>
-                      <strong className="text-red-700">Cursos vencidos ({driversCursoExpired.length}):</strong>
+                      <strong className="text-red-700">Motoristas com curso vencido ({driversCursoExpired.length}):</strong>
                       <ul className="list-disc ml-5 text-red-700">
                         {driversCursoExpired.slice(0, 3).map(d => (
                           <li key={d.id}>
-                            {d.nomeCompleto|| d.name || 'Motorista'} - Validade Curso: {new Date(d.cursoValidade).toLocaleDateString('pt-BR')}
+                            {d.nomeCompleto || d.name || 'Motorista'} - Vencido em {new Date(d.cursoValidade).toLocaleDateString('pt-BR')}
                           </li>
                         ))}
                         {driversCursoExpired.length > 3 && <li>... e mais {driversCursoExpired.length - 3}</li>}

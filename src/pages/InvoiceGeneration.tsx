@@ -16,6 +16,29 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 
+
+const getImageBase64 = (url: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous'; // importantíssimo para evitar erro CORS
+    img.src = url;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject('Canvas context error');
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const dataURL = canvas.toDataURL('image/png');
+      resolve(dataURL);
+    };
+    img.onerror = (err) => reject(err);
+  });
+};
+
 const InvoiceGeneration = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -80,7 +103,14 @@ const InvoiceGeneration = () => {
 
     const doc = new jsPDF();
 
-   
+   try {
+    // troque pela URL da sua imagem hospedada em algum lugar acessível na web
+    const logoUrl = 'https://i.imgur.com/filHQ4A.jpeg'; 
+    const logoBase64 = await getImageBase64(logoUrl);
+    doc.addImage(logoBase64, 'PNG', 14, 10, 50, 20);
+  } catch (error) {
+    console.error('Erro ao carregar imagem:', error);
+  }
 
     // Título
     doc.setFontSize(20);
