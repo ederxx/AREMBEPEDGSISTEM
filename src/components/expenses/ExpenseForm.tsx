@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { EXPENSE_CATEGORIES } from '@/constants/expenseCategories';
 import { ExpenseFormData } from '@/types/expense';
 
+
 interface ExpenseFormProps {
   vehiclePlates: string[];
   employeeNames: string[];
@@ -35,7 +36,8 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
     categoria: '',
     subcategoria: '',
     placa: '',
-   
+    empresa: '',
+    formaPagamento: '', // ✅ novo campo
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,7 +64,8 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
         categoria: '',
         subcategoria: '',
         placa: '',
-   // ✅ reset do status
+        empresa: '',
+        formaPagamento: '', // reset também aqui
       });
 
       setIsSubmitting(false);
@@ -87,8 +90,9 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
       !formData.dataVencimento ||
       !formData.valor ||
       !formData.categoria ||
-      !formData.subcategoria 
-     // ✅ validar status
+      !formData.subcategoria ||
+      !formData.empresa ||
+      !formData.formaPagamento // validação nova
     ) {
       toast({ title: 'Preencha todos os campos obrigatórios', variant: 'destructive' });
       return;
@@ -106,19 +110,21 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
       finalName = `${formData.placa} - ${formData.nome}`;
     }
 
-    const expenseData = {
-      nome: finalName,
-      dataVencimento: format(formData.dataVencimento, 'yyyy-MM-dd'),
-      dataPagamento: formData.dataPagamento
-        ? format(formData.dataPagamento, 'yyyy-MM-dd')
-        : undefined,
-      valor: parseFloat(formData.valor),
-      categoria: formData.categoria,
-      subcategoria: formData.subcategoria,
-    // ✅ incluir status no envio
-      createdAt: new Date().toISOString(),
-      userId: user?.uid,
-    };
+   const expenseData = {
+  nome: formData.nome,
+  valor: parseFloat(formData.valor),
+  categoria: formData.categoria,
+  subcategoria: formData.subcategoria,
+  empresa: formData.empresa,
+  formaPagamento: formData.formaPagamento,
+  dataVencimento: formData.dataVencimento ? format(formData.dataVencimento, 'yyyy-MM-dd') : undefined,
+  dataPagamento: formData.dataPagamento ? format(formData.dataPagamento, 'yyyy-MM-dd') : undefined,
+
+  userId: user?.uid || '',           // salva o uid do usuário
+  userName: user?.displayName || '', // salva o nome do usuário
+
+  createdAt: new Date().toISOString(),
+};
 
     try {
       await addExpenseMutation.mutateAsync(expenseData);
@@ -225,6 +231,41 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
           )}
 
           <div>
+            <Label>Empresa *</Label>
+            <Select
+              value={formData.empresa}
+              onValueChange={(value) => setFormData({ ...formData, empresa: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Arembepe Turismo">Arembepe Turismo</SelectItem>
+                <SelectItem value="DG Transportes">DG Transportes</SelectItem>
+                <SelectItem value="Terceirizado">Terceirizado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Forma de Pagamento *</Label>
+            <Select
+              value={formData.formaPagamento}
+              onValueChange={(value) => setFormData({ ...formData, formaPagamento: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a forma de pagamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Bradesco">Bradesco</SelectItem>
+                <SelectItem value="Brasil">Brasil</SelectItem>
+                <SelectItem value="Pix">Pix</SelectItem>
+                <SelectItem value="À Vista">À Vista</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
             <Label>Nome da Despesa *</Label>
             <Input
               value={formData.nome}
@@ -289,7 +330,6 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
                 </PopoverContent>
               </Popover>
             </div>
-
           </div>
 
           <div>

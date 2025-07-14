@@ -22,11 +22,11 @@ import { CATEGORY_NAMES } from '@/constants/expenseCategories';
 interface EditExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (updatedExpense: Partial<Expense>) => void;
+  onSave: (updatedExpense: Partial<Expense> & { id: string }) => void;
   expense: Expense | null;
+  usersMap?: Record<string, { displayName?: string; email?: string }>;
 }
 
-// Função que converte string "yyyy-MM-dd" para uma data ISO ajustada
 function parseLocalDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-').map(Number);
   const localDate = new Date(year, month - 1, day);
@@ -38,6 +38,7 @@ export function EditExpenseModal({
   onClose,
   onSave,
   expense,
+  usersMap = {},
 }: EditExpenseModalProps) {
   const [formData, setFormData] = useState<Partial<Expense>>({});
 
@@ -47,13 +48,18 @@ export function EditExpenseModal({
         ...expense,
         dataVencimento: expense.dataVencimento?.slice(0, 10),
         dataPagamento: expense.dataPagamento?.slice(0, 10),
+        formaPagamento: expense.formaPagamento || '',
+        userId: expense.userId || '',
       });
     }
   }, [expense]);
 
   const handleSave = () => {
-    const updatedExpense: Partial<Expense> = {
+    if (!expense) return;
+
+    const updatedExpense: Partial<Expense> & { id: string } = {
       ...formData,
+      id: expense.id,
       dataVencimento: formData.dataVencimento
         ? parseLocalDate(formData.dataVencimento)
         : undefined,
@@ -61,6 +67,13 @@ export function EditExpenseModal({
         ? parseLocalDate(formData.dataPagamento)
         : undefined,
     };
+
+    Object.keys(updatedExpense).forEach((key) => {
+      if (updatedExpense[key as keyof typeof updatedExpense] === undefined) {
+        delete updatedExpense[key as keyof typeof updatedExpense];
+      }
+    });
+
     onSave(updatedExpense);
   };
 
@@ -74,6 +87,7 @@ export function EditExpenseModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Nome */}
           <div>
             <Label>Nome</Label>
             <Input
@@ -84,20 +98,24 @@ export function EditExpenseModal({
             />
           </div>
 
+          {/* Valor */}
           <div>
             <Label>Valor</Label>
             <Input
               type="number"
-              value={formData.valor ?? ''}
+              step="0.01"
+              min="0"
+              value={formData.valor !== undefined ? formData.valor : ''}
               onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
-                  valor: parseFloat(e.target.value),
+                  valor: e.target.value === '' ? undefined : parseFloat(e.target.value),
                 }))
               }
             />
           </div>
 
+          {/* Categoria */}
           <div>
             <Label>Categoria</Label>
             <Select
@@ -119,6 +137,7 @@ export function EditExpenseModal({
             </Select>
           </div>
 
+          {/* Subcategoria */}
           <div>
             <Label>Subcategoria</Label>
             <Input
@@ -132,6 +151,48 @@ export function EditExpenseModal({
             />
           </div>
 
+          {/* Empresa */}
+          <div>
+            <Label>Empresa</Label>
+            <Select
+              value={formData.empresa || ''}
+              onValueChange={(value) =>
+                setFormData((prev) => ({ ...prev, empresa: value }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Arembepe Turismo">Arembepe Turismo</SelectItem>
+                <SelectItem value="DG Transportes">DG Transportes</SelectItem>
+                <SelectItem value="Terceirizado">Terceirizado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Forma de Pagamento */}
+          <div>
+            <Label>Forma de Pagamento</Label>
+            <Select
+              value={formData.formaPagamento || ''}
+              onValueChange={(value) =>
+                setFormData((prev) => ({ ...prev, formaPagamento: value }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a forma de pagamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                <SelectItem value="Banco do Brasil">Banco do Brasil</SelectItem>
+                <SelectItem value="Banco Bradesco">Banco Bradesco</SelectItem>
+                <SelectItem value="PIX">PIX</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Data de Vencimento */}
           <div>
             <Label>Data de Vencimento</Label>
             <Input
@@ -146,6 +207,7 @@ export function EditExpenseModal({
             />
           </div>
 
+          {/* Data de Pagamento */}
           <div>
             <Label>Data de Pagamento</Label>
             <Input
@@ -159,9 +221,28 @@ export function EditExpenseModal({
               }
             />
           </div>
+
+          {/* Usuário */}
+          <div>
+            <Label>Usuário</Label>
+            <select
+              value={formData.userId || ''}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, userId: e.target.value }))
+              }
+              className="w-full rounded border px-3 py-2"
+            >
+              <option value="">Selecione o usuário</option>
+              {Object.entries(usersMap).map(([uid, user]) => (
+                <option key={uid} value={uid}>
+                  {user.displayName || user.email || uid}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <DialogFooter className="mt-6">
+        <DialogFooter className="mt-6 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>

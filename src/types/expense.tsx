@@ -1,14 +1,14 @@
 export interface Expense {
   id: string;
   nome: string;
-  dataVencimento: string;
-  dataPagamento?: string;
   valor: number;
   categoria: string;
-  subcategoria: string;
-  status: 'pendente' | 'pago' | 'vencido';
-  createdAt: string;
-  userId: string; // adiciona aqui para tipar bem o usuário
+  subcategoria?: string;
+  empresa?: string;
+  formaPagamento?: string;
+  dataVencimento?: string; // ISO string
+  dataPagamento?: string; // ISO string
+  userId?: string;
 }
 
 export interface ExpenseFormData {
@@ -19,5 +19,7 @@ export interface ExpenseFormData {
   categoria: string;
   subcategoria: string;
   placa: string; 
+  empresa: string;
+  formaPagamento: string // adiciona aqui para tipar bem a empresa
 // placa do veículo ou nome do funcionário
 }

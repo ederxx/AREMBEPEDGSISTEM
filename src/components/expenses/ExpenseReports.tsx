@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Expense } from '@/types/expense';
 import { EXPENSE_CATEGORIES, CATEGORY_NAMES } from '@/constants/expenseCategories';
@@ -7,10 +6,23 @@ interface ExpenseReportsProps {
   expenses: Expense[];
 }
 
+// Função para calcular status da despesa, igual você usa antes
+const calculateStatus = (expense: Expense): 'pago' | 'pendente' | 'vencido' => {
+  const hoje = new Date();
+  const vencimento = new Date(expense.dataVencimento);
+  const pagamento = expense.dataPagamento ? new Date(expense.dataPagamento) : null;
+
+  if (pagamento && pagamento <= hoje) return 'pago';
+  if (vencimento > hoje && (!pagamento || pagamento > hoje)) return 'pendente';
+  if (vencimento < hoje && (!pagamento || pagamento > hoje)) return 'vencido';
+  return 'pendente';
+};
+
 const ExpenseReports = ({ expenses }: ExpenseReportsProps) => {
-  const pendingExpenses = expenses.filter(e => e.status === 'pendente') || [];
-  const overdueExpenses = expenses.filter(e => e.status === 'vencido') || [];
-  const paidExpenses = expenses.filter(e => e.status === 'pago') || [];
+  // Agora filtra usando a função calculateStatus
+  const pendingExpenses = expenses.filter(e => calculateStatus(e) === 'pendente');
+  const overdueExpenses = expenses.filter(e => calculateStatus(e) === 'vencido');
+  const paidExpenses = expenses.filter(e => calculateStatus(e) === 'pago');
 
   return (
     <Card>

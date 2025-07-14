@@ -12,7 +12,7 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/config/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { differenceInDays, parseISO } from 'date-fns'; // Instale date-fns se quiser para facilitar
+import { differenceInDays, parseISO } from 'date-fns';
 
 interface Driver {
   id?: string;
@@ -31,7 +31,8 @@ const DriversManagement = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
- const today = new Date();
+  const today = new Date();
+
   const [showForm, setShowForm] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
@@ -60,20 +61,16 @@ const DriversManagement = () => {
       const snapshot = await getDocs(collection(db, 'drivers'));
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Driver[];
     },
-    onError: () =>
-      toast({
-        title: 'Erro',
-        description: 'Erro ao carregar motoristas.',
-        variant: 'destructive',
-      }),
   });
-const cnhExpiring = drivers?.filter(driver => {
-    if (!driver.cnhValidade) return false;
-    const validade = parseISO(driver.cnhValidade);
-    const diff = differenceInDays(validade, today);
-    return diff <= 60;
-  }) || [];
-  
+
+  const cnhExpiring =
+    drivers?.filter(driver => {
+      if (!driver.cnhValidade) return false;
+      const validade = parseISO(driver.cnhValidade);
+      const diff = differenceInDays(validade, today);
+      return diff <= 60;
+    }) || [];
+
   const uploadPhoto = async (file: File): Promise<string> => {
     const fileName = `${Date.now()}_${file.name}`;
     const photoRef = ref(storage, `drivers/${fileName}`);
@@ -99,14 +96,9 @@ const cnhExpiring = drivers?.filter(driver => {
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
       resetForm();
       setShowForm(false);
-      toast({ title: 'Sucesso', description: 'Motorista cadastrado.' });
+      toast({ title: 'Sucesso', description: 'Funcionário cadastrado.' });
     },
-    onError: () =>
-      toast({
-        title: 'Erro',
-        description: 'Erro ao cadastrar motorista.',
-        variant: 'destructive',
-      }),
+    onError: () => toast({ title: 'Erro', description: 'Erro ao cadastrar funcionário.', variant: 'destructive' }),
   });
 
   const updateDriverMutation = useMutation({
@@ -128,28 +120,18 @@ const cnhExpiring = drivers?.filter(driver => {
       resetForm();
       setEditingDriver(null);
       setShowForm(false);
-      toast({ title: 'Sucesso', description: 'Motorista atualizado.' });
+      toast({ title: 'Sucesso', description: 'Funcionário atualizado.' });
     },
-    onError: () =>
-      toast({
-        title: 'Erro',
-        description: 'Erro ao atualizar motorista.',
-        variant: 'destructive',
-      }),
+    onError: () => toast({ title: 'Erro', description: 'Erro ao atualizar funcionário.', variant: 'destructive' }),
   });
 
   const deleteDriverMutation = useMutation({
     mutationFn: async (id: string) => await deleteDoc(doc(db, 'drivers', id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
-      toast({ title: 'Sucesso', description: 'Motorista excluído.' });
+      toast({ title: 'Sucesso', description: 'Funcionário excluído.' });
     },
-    onError: () =>
-      toast({
-        title: 'Erro',
-        description: 'Erro ao excluir motorista.',
-        variant: 'destructive',
-      }),
+    onError: () => toast({ title: 'Erro', description: 'Erro ao excluir funcionário.', variant: 'destructive' }),
   });
 
   const resetForm = () => {
@@ -168,20 +150,24 @@ const cnhExpiring = drivers?.filter(driver => {
 
   const handleEdit = (driver: Driver) => {
     setEditingDriver(driver);
-    setFormData(driver);
+ setFormData({
+    nomeCompleto: driver.nomeCompleto || '',
+    telefone: driver.telefone || '',
+    empresa: driver.empresa || '',
+    photoURL: driver.photoURL || '',
+    dadosBancarios: driver.dadosBancarios || '',
+    cnHNumber: driver.cnHNumber || '',
+    cnhValidade: driver.cnhValidade || '',
+    cursoValidade: driver.cursoValidade || '',
+  });
     setShowForm(true);
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+    if (e.target.files?.[0]) {
       const file = e.target.files[0];
       if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
-        toast({
-          title: 'Erro',
-          description: 'Arquivo inválido. Apenas imagens até 5MB.',
-          variant: 'destructive',
-        });
-        return;
+        return toast({ title: 'Erro', description: 'Arquivo inválido. Apenas imagens até 5MB.', variant: 'destructive' });
       }
       setPhotoFile(file);
     }
@@ -190,11 +176,7 @@ const cnhExpiring = drivers?.filter(driver => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.nomeCompleto || !formData.telefone || !formData.empresa) {
-      return toast({
-        title: 'Erro',
-        description: 'Preencha todos os campos obrigatórios.',
-        variant: 'destructive',
-      });
+      return toast({ title: 'Erro', description: 'Preencha todos os campos obrigatórios.', variant: 'destructive' });
     }
     editingDriver
       ? updateDriverMutation.mutate({ id: editingDriver.id!, data: formData })
@@ -202,74 +184,49 @@ const cnhExpiring = drivers?.filter(driver => {
   };
 
   const isSubmitting = addDriverMutation.isPending || updateDriverMutation.isPending || uploadingPhoto;
-
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* MODAL DE DETALHES */}
-   {showModal && selectedDriver && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg relative animate-fade-in">
-      {/* Botão de fechar */}
-      <button
-        className="absolute top-2 right-2 text-gray-500 hover:text-black text-xl"
-        onClick={() => setShowModal(false)}
-      >
-        ✕
-      </button>
-
-      {/* Cabeçalho com imagem e nome */}
-      <div className="flex items-center space-x-4 mb-4">
-        {selectedDriver.photoURL ? (
-          <img
-            src={selectedDriver.photoURL}
-            alt={selectedDriver.nomeCompleto}
-            className="w-20 h-20 rounded-full object-cover"
-          />
-        ) : (
-          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
-            <User className="w-10 h-10 text-gray-500" />
+      {showModal && selectedDriver && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg relative">
+            <button className="absolute top-2 right-2 text-gray-500 hover:text-black text-xl" onClick={() => setShowModal(false)}>
+              ✕
+            </button>
+            <div className="flex items-center space-x-4 mb-4">
+              {selectedDriver.photoURL ? (
+                <img src={selectedDriver.photoURL} alt={selectedDriver.nomeCompleto} className="w-20 h-20 rounded-full object-cover" />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
+                  <User className="w-10 h-10 text-gray-500" />
+                </div>
+              )}
+              <div>
+                <h2 className="text-xl font-bold">{selectedDriver.nomeCompleto}</h2>
+                <p className="text-gray-600">{selectedDriver.empresa}</p>
+              </div>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <p><strong>Telefone:</strong> {selectedDriver.telefone}</p>
+                <a
+                  href={`https://wa.me/${selectedDriver.telefone.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-green-600 font-semibold underline hover:text-green-700"
+                >
+                  WhatsApp
+                </a>
+              </div>
+              <p><strong>Número da CNH:</strong> {selectedDriver.cnHNumber}</p>
+              <p><strong>Validade da CNH:</strong> {selectedDriver.cnhValidade}</p>
+              <p><strong>Validade do Curso:</strong> {selectedDriver.cursoValidade}</p>
+              <p><strong>Dados Bancários:</strong> {selectedDriver.dadosBancarios}</p>
+            </div>
           </div>
-        )}
-        <div>
-          <h2 className="text-xl font-bold">{selectedDriver.nomeCompleto}</h2>
-          <p className="text-gray-600">{selectedDriver.empresa}</p>
         </div>
-      </div>
-
-      {/* Informações detalhadas */}
-      <div className="space-y-3 text-sm">
-        <div className="flex items-center justify-between">
-          <p>
-            <strong>Telefone:</strong> {selectedDriver.telefone}
-          </p>
-          <a
-            href={`https://wa.me/${selectedDriver.telefone.replace(/\D/g, '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-green-600 font-semibold underline hover:text-green-700"
-          >
-            WhatsApp
-          </a>
-        </div>
-
-        <p>
-          <strong>Número da CNH:</strong> {selectedDriver.cnHNumber}
-        </p>
-        <p>
-          <strong>Validade da CNH:</strong> {selectedDriver.cnhValidade}
-        </p>
-        <p>
-          <strong>Validade do Curso:</strong> {selectedDriver.cursoValidade}
-        </p>
-        <p>
-          <strong>Dados Bancários:</strong> {selectedDriver.dadosBancarios}
-        </p>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       <header className="bg-white border-b shadow-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -278,51 +235,80 @@ const cnhExpiring = drivers?.filter(driver => {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar
             </Button>
-            <h1 className="text-2xl font-bold text-teal-600">Gestão de Motoristas</h1>
+            <h1 className="text-2xl font-bold text-teal-600">Gestão de Funcionários</h1>
           </div>
           <Button onClick={() => setShowForm(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Novo Motorista
+            Novo Funcionário
           </Button>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* FORMULÁRIO */}
         {showForm && (
           <Card className="mb-8">
             <CardHeader>
-              <CardTitle>{editingDriver ? 'Editar Motorista' : 'Cadastrar Novo Motorista'}</CardTitle>
+              <CardTitle>{editingDriver ? 'Editar Funcionário' : 'Cadastrar Novo Funcionário'}</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label>Nome Completo *</Label>
-                  <Input value={formData.nomeCompleto} onChange={(e) => setFormData({ ...formData, nomeCompleto: e.target.value })} />
+                  <Input
+                    value={formData.nomeCompleto}
+                    onChange={e => setFormData({ ...formData, nomeCompleto: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>Telefone *</Label>
-                  <Input value={formData.telefone} onChange={(e) => setFormData({ ...formData, telefone: e.target.value })} />
+                  <Input
+                    value={formData.telefone}
+                    onChange={e => setFormData({ ...formData, telefone: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>Empresa *</Label>
-                  <Input value={formData.empresa} onChange={(e) => setFormData({ ...formData, empresa: e.target.value })} />
+                  <select
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 mt-1 text-sm"
+                    value={formData.empresa}
+                    onChange={e => setFormData({ ...formData, empresa: e.target.value })}
+                    required
+                  >
+                    <option value="">Selecione a empresa</option>
+                    <option value="Arembepe Transportes e Turismo">Arembepe Transportes e Turismo</option>
+                    <option value="Dg Turismo e Transportes">Dg Turismo e Transportes</option>
+                    <option value="Tercerizado">Tercerizado</option>
+                  </select>
                 </div>
                 <div>
                   <Label>Dados Bancários *</Label>
-                  <Input value={formData.dadosBancarios} onChange={(e) => setFormData({ ...formData, dadosBancarios: e.target.value })} />
+                  <Input
+                    value={formData.dadosBancarios}
+                    onChange={e => setFormData({ ...formData, dadosBancarios: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>Nº CNH *</Label>
-                  <Input value={formData.cnHNumber} onChange={(e) => setFormData({ ...formData, cnHNumber: e.target.value })} />
+                  <Input
+                    value={formData.cnHNumber}
+                    onChange={e => setFormData({ ...formData, cnHNumber: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>Validade CNH *</Label>
-                  <Input type="date" value={formData.cnhValidade} onChange={(e) => setFormData({ ...formData, cnhValidade: e.target.value })} />
+                  <Input
+                    type="date"
+                    value={formData.cnhValidade}
+                    onChange={e => setFormData({ ...formData, cnhValidade: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>Validade Curso *</Label>
-                  <Input type="date" value={formData.cursoValidade} onChange={(e) => setFormData({ ...formData, cursoValidade: e.target.value })} />
+                  <Input
+                    type="date"
+                    value={formData.cursoValidade}
+                    onChange={e => setFormData({ ...formData, cursoValidade: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>Foto</Label>
@@ -338,10 +324,9 @@ const cnhExpiring = drivers?.filter(driver => {
           </Card>
         )}
 
-        {/* LISTAGEM */}
         <Card>
           <CardHeader>
-            <CardTitle>Motoristas Cadastrados</CardTitle>
+            <CardTitle>Funcionários Cadastrados</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -360,7 +345,7 @@ const cnhExpiring = drivers?.filter(driver => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {drivers.map((driver) => (
+                  {drivers.map(driver => (
                     <TableRow key={driver.id}>
                       <TableCell>
                         {driver.photoURL ? (
@@ -392,7 +377,7 @@ const cnhExpiring = drivers?.filter(driver => {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-center py-8 text-gray-500">Nenhum motorista cadastrado.</p>
+              <p className="text-center py-8 text-gray-500">Nenhum funcionário cadastrado.</p>
             )}
           </CardContent>
         </Card>

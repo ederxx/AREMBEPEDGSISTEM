@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -12,10 +11,11 @@ import { useNavigate } from 'react-router-dom';
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState(''); // ✅ Nome do usuário
   const [adminCode, setAdminCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
-  const { login, register } = useAuth();
+  const { login, register } = useAuth(); // ✅ register deve aceitar nome
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -34,7 +34,7 @@ const Auth = () => {
           setLoading(false);
           return;
         }
-        await register(email, password);
+        await register(email, password, name); // ✅ enviar o nome
         toast({
           title: "Conta criada!",
           description: "Login realizado com sucesso.",
@@ -77,6 +77,20 @@ const Auth = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAuth} className="space-y-4">
+              {isSignUp && (
+                <div>
+                  <Label htmlFor="name">Nome do Usuário</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    className="mt-1"
+                    placeholder="Digite seu nome"
+                  />
+                </div>
+              )}
               <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -117,7 +131,7 @@ const Auth = () => {
                 {loading ? 'Carregando...' : isSignUp ? 'Criar Conta' : 'Entrar'}
               </Button>
             </form>
-            
+
             <div className="mt-4 text-center">
               <button
                 type="button"

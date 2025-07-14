@@ -276,7 +276,7 @@ const Dashboard = () => {
           {/* Motoristas */}
           <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/drivers')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Motoristas</CardTitle>
+              <CardTitle className="text-sm font-medium">Funcionários</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
