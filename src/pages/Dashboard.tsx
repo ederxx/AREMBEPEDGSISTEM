@@ -8,6 +8,8 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { parseISO } from 'date-fns';
+import BackupDownloader from '../pages/BackupDownloader';
+
 
 interface Quote {
   id: string;
@@ -542,6 +544,7 @@ const totalValorFinalizado = (services || [])
               )}
             </CardContent>
           </Card>
+         {/* <BackupDownloader /> */}
         </div>
       </main>
     </div>

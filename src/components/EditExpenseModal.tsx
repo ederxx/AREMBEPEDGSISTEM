@@ -25,6 +25,7 @@ interface EditExpenseModalProps {
   onSave: (updatedExpense: Partial<Expense> & { id: string }) => void;
   expense: Expense | null;
   usersMap?: Record<string, { displayName?: string; email?: string }>;
+  employeeNames?: string[]; // lista de funcionários para o select
 }
 
 function parseLocalDate(dateStr: string): string {
@@ -39,8 +40,9 @@ export function EditExpenseModal({
   onSave,
   expense,
   usersMap = {},
+  employeeNames = [],  // lista padrão vazia
 }: EditExpenseModalProps) {
-  const [formData, setFormData] = useState<Partial<Expense>>({});
+  const [formData, setFormData] = useState<Partial<Expense> & { funcionario?: string; recorrente?: boolean }>({});
 
   useEffect(() => {
     if (expense) {
@@ -50,6 +52,8 @@ export function EditExpenseModal({
         dataPagamento: expense.dataPagamento?.slice(0, 10),
         formaPagamento: expense.formaPagamento || '',
         userId: expense.userId || '',
+        funcionario: (expense as any).funcionario || '', // se estiver usando funcionario
+        recorrente: false, // sempre iniciar como falso na edição
       });
     }
   }, [expense]);
@@ -66,6 +70,9 @@ export function EditExpenseModal({
       dataPagamento: formData.dataPagamento
         ? parseLocalDate(formData.dataPagamento)
         : undefined,
+      // Inclui funcionario e recorrente no objeto salvo
+      funcionario: formData.funcionario || undefined,
+      recorrente: formData.recorrente || false,
     };
 
     Object.keys(updatedExpense).forEach((key) => {
@@ -222,23 +229,46 @@ export function EditExpenseModal({
             />
           </div>
 
-          {/* Usuário */}
-          <div>
-            <Label>Usuário</Label>
-            <select
-              value={formData.userId || ''}
+          {/* Funcionário - só exibe se categoria for funcionarios */}
+          {formData.categoria === 'funcionarios' && (
+            <div>
+              <Label>Funcionário</Label>
+              <Select
+                value={formData.funcionario || ''}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, funcionario: value }))
+                }
+              >
+               <SelectTrigger>
+        <SelectValue placeholder="Selecione o funcionário" />
+      </SelectTrigger>
+      <SelectContent>
+        {employeeNames.map((nome) => (
+          <SelectItem key={nome} value={nome}>
+            {nome}
+          </SelectItem>
+        ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+       
+     
+
+          {/* Despesa Recorrente */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="recorrente"
+              checked={formData.recorrente || false}
               onChange={(e) =>
-                setFormData((prev) => ({ ...prev, userId: e.target.value }))
+                setFormData((prev) => ({ ...prev, recorrente: e.target.checked }))
               }
-              className="w-full rounded border px-3 py-2"
-            >
-              <option value="">Selecione o usuário</option>
-              {Object.entries(usersMap).map(([uid, user]) => (
-                <option key={uid} value={uid}>
-                  {user.displayName || user.email || uid}
-                </option>
-              ))}
-            </select>
+            />
+            <label htmlFor="recorrente" className="text-sm select-none">
+              Despesa Recorrente (12 meses)
+            </label>
           </div>
         </div>
 

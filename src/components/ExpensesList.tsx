@@ -41,6 +41,8 @@ import { Expense } from '@/types/expense';
 import { CATEGORY_NAMES } from '@/constants/expenseCategories';
 import { EditExpenseModal } from '@/components/EditExpenseModal';
 import { useAuth } from '@/hooks/useAuth';
+import { parse } from 'date-fns';
+
 interface ExpensesListProps {
   expenses: Expense[];
   isLoading: boolean;
@@ -447,6 +449,7 @@ const { user } = useAuth();
                   <TableHead>Valor</TableHead>
                   <TableHead>Empresa</TableHead>
                   <TableHead>Forma de Pagamento</TableHead>
+                  <TableHead>Funcionário</TableHead>
                   <TableHead>Usuário </TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -468,11 +471,19 @@ const { user } = useAuth();
                       <TableCell className="font-medium">{expense.nome}</TableCell>
                       <TableCell>{CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES]}</TableCell>
                       <TableCell>{expense.subcategoria || '-'}</TableCell>
-                      <TableCell>{new Date(expense.dataVencimento).toLocaleDateString('pt-BR')}</TableCell>
-                      <TableCell>{expense.dataPagamento ? new Date(expense.dataPagamento).toLocaleDateString('pt-BR') : '-'}</TableCell>
+                      <TableCell>{parse(expense.dataVencimento, 'yyyy-MM-dd', new Date()).toLocaleDateString('pt-BR')
+}</TableCell>
+                      <TableCell>{expense.dataPagamento 
+  ? parse(expense.dataPagamento, 'yyyy-MM-dd', new Date()).toLocaleDateString('pt-BR') 
+  : '-'}</TableCell>
                       <TableCell className="font-medium">R$ {expense.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>{expense.empresa || '-'}</TableCell>
                       <TableCell>{expense.formaPagamento || '-'}</TableCell>
+                     <TableCell>
+                            {expense.categoria === 'funcionarios' && expense.funcionario
+                              ? expense.funcionario
+                                             : '-'}
+                          </TableCell>
                      <TableCell>{usersMap[expense.userId]?.displayName || 'Desconhecido'}</TableCell>
                       <TableCell>
                         <div className="flex space-x-2">

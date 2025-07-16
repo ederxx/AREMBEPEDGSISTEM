@@ -10,6 +10,7 @@ export interface Expense {
   dataPagamento?: string; // ISO string
   userId?: string;
     createdAt?: any;
+       funcionario?: string;
   status?: 'pendente' | 'pago' | 'vencido';
 }
 
