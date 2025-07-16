@@ -58,7 +58,7 @@ queryFn: async () => {
   const snapshot = await getDocs(collection(db, 'services'));
   return snapshot.docs
     .map(doc => ({ id: doc.id, ...doc.data() as any }))
-    .filter(service => service.status === 'faturados');
+    .filter(service => service.status === 'faturado');
 },
     enabled: !!user
   });
