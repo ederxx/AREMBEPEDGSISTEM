@@ -202,7 +202,8 @@ const totalValorFinalizado = (services || [])
   const totalDrivers = drivers || [];
   const pendingExpenses = expenses?.filter(e => e.status === 'pendente') || [];
   const overdueExpenses = expenses?.filter(e => e.status === 'vencido') || [];
-  const totalExpensesValue = expenses?.reduce((sum, e) => sum + e.valor, 0) || 0;
+ const totalExpensesValue = pendingExpenses.reduce((sum, e) => sum + e.valor, 0) || 0;
+
 
   // Motoristas CNH e Curso
   const driversCNHExpiring = (drivers || []).filter(d => {
