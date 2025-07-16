@@ -115,25 +115,29 @@ const ExpenseCharts = ({ expenses }: { expenses: Expense[] }) => {
       count: categoryExpenses.length,
     };
   }).filter(item => item.value > 0);
-
-  const statusData = [
-    {
-      name: 'Pagas',
-      value: filteredExpenses.filter(e => e.status === 'pago').reduce((sum, e) => sum + e.valor, 0),
-      count: filteredExpenses.filter(e => e.status === 'pago').length,
-    },
-    {
-      name: 'Pendentes',
-      value: filteredExpenses.filter(e => e.status === 'pendente').reduce((sum, e) => sum + e.valor, 0),
-      count: filteredExpenses.filter(e => e.status === 'pendente').length,
-    },
-    {
-      name: 'Vencidas',
-      value: filteredExpenses.filter(e => e.status === 'vencido').reduce((sum, e) => sum + e.valor, 0),
-      count: filteredExpenses.filter(e => e.status === 'vencido').length,
-    },
-  ].filter(item => item.value > 0);
-
+  const enrichedExpenses = useMemo(() => {
+  return filteredExpenses.map(e => ({
+    ...e,
+    computedStatus: calculateStatus(e),
+  }));
+}, [filteredExpenses]);
+const statusData = [
+  {
+    name: 'Pagas',
+    value: enrichedExpenses.filter(e => e.computedStatus === 'pago').reduce((sum, e) => sum + e.valor, 0),
+    count: enrichedExpenses.filter(e => e.computedStatus === 'pago').length,
+  },
+  {
+    name: 'Pendentes',
+    value: enrichedExpenses.filter(e => e.computedStatus === 'pendente').reduce((sum, e) => sum + e.valor, 0),
+    count: enrichedExpenses.filter(e => e.computedStatus === 'pendente').length,
+  },
+  {
+    name: 'Vencidas',
+    value: enrichedExpenses.filter(e => e.computedStatus === 'vencido').reduce((sum, e) => sum + e.valor, 0),
+    count: enrichedExpenses.filter(e => e.computedStatus === 'vencido').length,
+  },
+].filter(item => item.value > 0);
   const subcategoryData = filteredExpenses.reduce((acc, expense) => {
     const key = `${expense.categoria}-${expense.subcategoria}`;
     if (!acc[key]) {
@@ -401,4 +405,16 @@ const ExpenseCharts = ({ expenses }: { expenses: Expense[] }) => {
   );
 };
 
+const calculateStatus = (expense: Expense): 'pago' | 'pendente' | 'vencido' => {
+  const hoje = new Date();
+  const vencimento = new Date(expense.dataVencimento);
+  const pagamento = expense.dataPagamento ? new Date(expense.dataPagamento) : null;
+
+  if (pagamento && pagamento <= hoje) return 'pago';
+  if (vencimento > hoje && (!pagamento || pagamento > hoje)) return 'pendente';
+  if (vencimento < hoje && (!pagamento || pagamento > hoje)) return 'vencido';
+  return 'pendente';
+};
+
 export default ExpenseCharts;
+

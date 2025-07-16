@@ -136,7 +136,8 @@ queryFn: async () => {
       styles: { fontSize: 11 }
     });
 
-    const finalY = doc.lastAutoTable.finalY || 100;
+    // Use doc.lastAutoTable.finalY to get the Y position after the table
+    const finalY = (doc as any).lastAutoTable?.finalY || 100;
     doc.setFontSize(14);
     doc.text(`Total: ${formatCurrency(totalValue)}`, 14, finalY + 15);
 
