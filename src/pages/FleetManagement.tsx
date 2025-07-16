@@ -159,7 +159,12 @@ const FleetManagement = () => {
             <CardContent>
               <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div><Label>Placa *</Label><Input value={formData.placa} onChange={e => setFormData({ ...formData, placa: e.target.value })} required /></div>
-                <div><Label>Tipo *</Label><Select value={formData.tipo} onValueChange={v => setFormData({ ...formData, tipo: v })}><SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="Van">Van</SelectItem><SelectItem value="Ônibus">Ônibus</SelectItem></SelectContent></Select></div>
+                <div><Label>Tipo *</Label><Select value={formData.tipo} onValueChange={v => setFormData({ ...formData, tipo: v })}><SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="Van">Van</SelectItem>
+                <SelectItem value="Tercerizado">Tercerizado</SelectItem>
+                <SelectItem value="Sedan">Sedan</SelectItem>
+                <SelectItem value="Micro-Onibus">Micro-Onibus</SelectItem>
+                <SelectItem value="Ônibus">Ônibus</SelectItem>
+                </SelectContent></Select></div>
                 <div><Label>Cor *</Label><Input value={formData.cor} onChange={e => setFormData({ ...formData, cor: e.target.value })} required /></div>
                 <div><Label>RENAVAM *</Label><Input value={formData.renavam} onChange={e => setFormData({ ...formData, renavam: e.target.value })} required /></div>
                 <div><Label>Passageiros *</Label><Input type="number" min={1} value={formData.numeroPassageiros} onChange={e => setFormData({ ...formData, numeroPassageiros: parseInt(e.target.value) })} required /></div>
