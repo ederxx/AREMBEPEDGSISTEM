@@ -290,143 +290,141 @@ const { user } = useAuth();
   return (
     <div className="space-y-6">
       {/* FILTROS */}
-      <Card>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-4">
-            {/* Status */}
-            <div className="flex flex-col">
-              <label htmlFor="statusFilter" className="font-medium">
-                Status
-              </label>
-              <select
-                id="statusFilter"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="rounded border px-3 py-1"
-              >
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+     <Card>
+  <CardContent className="space-y-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Status */}
+      <div className="flex flex-col">
+        <label htmlFor="statusFilter" className="text-sm font-medium text-muted-foreground mb-1">Status</label>
+        <select
+          id="statusFilter"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-            {/* Empresa */}
-            <div className="flex flex-col">
-              <label htmlFor="companyFilter" className="font-medium">
-                Empresa
-              </label>
-              <select
-                id="companyFilter"
-                value={filterCompany}
-                onChange={(e) => setFilterCompany(e.target.value)}
-                className="rounded border px-3 py-1"
-              >
-                <option value="">Todas</option>
-                {/* Opcional: mapear empresas dinamicamente */}
-                <option value="Arembepe Turismo">Arembepe Turismo</option>
-                <option value="DG Transportes">DG Transportes</option>
-                <option value="Terceirizado">Terceirizado</option>
-              </select>
-            </div>
+      {/* Empresa */}
+      <div className="flex flex-col">
+        <label htmlFor="companyFilter" className="text-sm font-medium text-muted-foreground mb-1">Empresa</label>
+        <select
+          id="companyFilter"
+          value={filterCompany}
+          onChange={(e) => setFilterCompany(e.target.value)}
+          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+        >
+          <option value="">Todas</option>
+          <option value="Arembepe Turismo">Arembepe Turismo</option>
+          <option value="DG Transportes">DG Transportes</option>
+          <option value="Terceirizado">Terceirizado</option>
+        </select>
+      </div>
 
-            {/* Forma de Pagamento */}
-            <div className="flex flex-col">
-              <label htmlFor="paymentMethodFilter" className="font-medium">
-                Forma de Pagamento
-              </label>
-              <select
-                id="paymentMethodFilter"
-                value={filterPaymentMethod}
-                onChange={(e) => setFilterPaymentMethod(e.target.value)}
-                className="rounded border px-3 py-1"
-              >
-                <option value="">Todas</option>
-                {uniquePaymentMethods.map((method) => (
-                  <option key={method} value={method}>
-                    {method}
-                  </option>
-                ))}
-              </select>
-            </div>
+      {/* Forma de Pagamento */}
+      <div className="flex flex-col">
+        <label htmlFor="paymentMethodFilter" className="text-sm font-medium text-muted-foreground mb-1">Forma de Pagamento</label>
+        <select
+          id="paymentMethodFilter"
+          value={filterPaymentMethod}
+          onChange={(e) => setFilterPaymentMethod(e.target.value)}
+          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+        >
+          <option value="">Todas</option>
+          {uniquePaymentMethods.map((method) => (
+            <option key={method} value={method}>
+              {method}
+            </option>
+          ))}
+        </select>
+      </div>
 
-            {/* Mês */}
-            <div className="flex flex-col">
-              <label htmlFor="monthFilter" className="font-medium">
-                Mês
-              </label>
-              <select
-                id="monthFilter"
-                value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value)}
-                className="rounded border px-3 py-1"
-              >
-                {MONTH_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+      {/* Mês */}
+      <div className="flex flex-col">
+        <label htmlFor="monthFilter" className="text-sm font-medium text-muted-foreground mb-1">Mês</label>
+        <select
+          id="monthFilter"
+          value={filterMonth}
+          onChange={(e) => setFilterMonth(e.target.value)}
+          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+        >
+          {MONTH_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-            {/* Data Inicial */}
-            <div className="flex flex-col">
-              <label htmlFor="startDateFilter" className="font-medium">
-                Data Inicial
-              </label>
-              <input
-                id="startDateFilter"
-                type="date"
-                value={filterStartDate}
-                onChange={(e) => setFilterStartDate(e.target.value)}
-                className="rounded border px-3 py-1"
-              />
-            </div>
+      {/* Data Inicial */}
+      <div className="flex flex-col">
+        <label htmlFor="startDateFilter" className="text-sm font-medium text-muted-foreground mb-1">Data Inicial</label>
+        <input
+          id="startDateFilter"
+          type="date"
+          value={filterStartDate}
+          onChange={(e) => setFilterStartDate(e.target.value)}
+          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+        />
+      </div>
 
-            {/* Data Final */}
-            <div className="flex flex-col">
-              <label htmlFor="endDateFilter" className="font-medium">
-                Data Final
-              </label>
-              <input
-                id="endDateFilter"
-                type="date"
-                value={filterEndDate}
-                onChange={(e) => setFilterEndDate(e.target.value)}
-                className="rounded border px-3 py-1"
-              />
-            </div>
-          </div>
+      {/* Data Final */}
+      <div className="flex flex-col">
+        <label htmlFor="endDateFilter" className="text-sm font-medium text-muted-foreground mb-1">Data Final</label>
+        <input
+          id="endDateFilter"
+          type="date"
+          value={filterEndDate}
+          onChange={(e) => setFilterEndDate(e.target.value)}
+          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+        />
+      </div>
+    </div>
 
-          {/* Categorias multi-select */}
-          <div>
-            <span className="font-medium">Categorias</span>
-            <div className="flex flex-wrap gap-3 mt-1 max-w-xl">
-              {Object.entries(CATEGORY_NAMES).map(([key, label]) => (
-                <label
-                  key={key}
-                  className="inline-flex items-center space-x-2 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={filterCategorySet.has(key)}
-                    onChange={() => toggleCategory(key)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span>{label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+    {/* Categorias */}
+    <div>
+      <label className="text-sm font-medium text-muted-foreground mb-2 block">Categorias</label>
+      <div className="flex flex-wrap gap-3 max-w-4xl">
+        {Object.entries(CATEGORY_NAMES).map(([key, label]) => (
+          <label
+            key={key}
+            className="inline-flex items-center gap-2 text-sm text-gray-700"
+          >
+            <input
+              type="checkbox"
+              checked={filterCategorySet.has(key)}
+              onChange={() => toggleCategory(key)}
+              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+    </div>
 
-          <div>
-            <Button variant="outline" onClick={clearFilters}>
-              Limpar Filtros
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+    {/* Botão limpar filtros */}
+    <div className="pt-2">
+      <Button variant="outline" onClick={clearFilters}>
+        Limpar Filtros
+      </Button>
+    </div>
+  </CardContent>
+
+  <CardContent className="flex justify-between items-center px-6 py-4">
+    <div className="text-lg font-medium">
+      Total filtrado: {filteredExpenses.length} {filteredExpenses.length === 1 ? 'despesa' : 'despesas'}
+    </div>
+    <div className="text-lg font-semibold text-green-700">
+     Total: R$ {filteredExpenses.reduce((acc, e) => acc + e.valor, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+    </div>
+  </CardContent>
+</Card>
+      
 
       {/* TABELA */}
       <Card>
@@ -535,7 +533,7 @@ const { user } = useAuth();
                             variant="destructive"
                             size="sm"
                             onClick={() => deleteExpenseMutation.mutate(expense.id)}
-                            disabled={deleteExpenseMutation.isLoading}
+                            disabled={deleteExpenseMutation.isPending}
                           >
                             Excluir
                           </Button>

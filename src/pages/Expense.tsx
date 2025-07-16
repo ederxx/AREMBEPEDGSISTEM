@@ -31,6 +31,8 @@ const Expenses = () => {
       console.log('Email do usuário:', user.email);
     }
   }, [user, navigate]);
+//buscar funcionario 
+
 
   // Buscar placas dos veículos
   useQuery({
@@ -89,11 +91,10 @@ const Expenses = () => {
         
         const snapshot = await getDocs(driversRef);
         console.log('Snapshot drivers recebido:', snapshot.size, 'documentos');
-        
-        const names = snapshot.docs.map(doc => {
-          console.log('Documento driver:', doc.id, doc.data());
-          return doc.data().nome || doc.data().name;
-        }).filter(Boolean);
+    const names = snapshot.docs.map(doc => {
+  console.log('Documento driver:', doc.id, doc.data());
+  return doc.data().nomeCompleto;
+}).filter(Boolean);
         
         console.log('Nomes encontrados:', names);
         setEmployeeNames(names);
@@ -156,8 +157,12 @@ const Expenses = () => {
 
           expenses.push({
             id: doc.id,
+            nome: data.nome,
+            valor: data.valor,
+            categoria: data.categoria,
             ...data,
-            status
+            status,
+            createdAt: data.createdAt || null // Ensure createdAt is present
           } as Expense);
         });
         
@@ -199,41 +204,53 @@ const Expenses = () => {
           </div>
         </div>
       </header>
+<main className="container mx-auto px-4 py-8">
 
-      <main className="container mx-auto px-4 py-8">
-        {/* Debug Card para status da conexão */}
-        
-        {/* Cards de Resumo */}
-        <ExpenseSummary expenses={expenses || []} />
+  {/* Cards de Resumo */}
+  {!isLoading && expenses?.length > 0 && (
+    <ExpenseSummary expenses={expenses} />
+  )}
 
-        <Tabs defaultValue="add" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="add">Adicionar Despesa</TabsTrigger>
-            <TabsTrigger value="list">Lista de Despesas</TabsTrigger>
-            <TabsTrigger value="charts">Análises</TabsTrigger>
-            <TabsTrigger value="reports">Relatórios</TabsTrigger>
-          </TabsList>
+  <Tabs defaultValue="add" className="space-y-6">
+    <TabsList className="grid w-full grid-cols-4">
+      <TabsTrigger value="add">Adicionar Despesa</TabsTrigger>
+      <TabsTrigger value="list">Lista de Despesas</TabsTrigger>
+      <TabsTrigger value="charts">Análises</TabsTrigger>
+      <TabsTrigger value="reports">Relatórios</TabsTrigger>
+    </TabsList>
 
-          <TabsContent value="add">
-            <ExpenseForm 
-              vehiclePlates={vehiclePlates} 
-              employeeNames={employeeNames}
-            />
-          </TabsContent>
+    <TabsContent value="add">
+      <ExpenseForm 
+        vehiclePlates={vehiclePlates} 
+        employeeNames={employeeNames}
+      />
+    </TabsContent>
 
-          <TabsContent value="list">
-            <ExpensesList expenses={expenses || []} isLoading={isLoading} />
-          </TabsContent>
+    <TabsContent value="list">
+      <ExpensesList expenses={expenses || []} isLoading={isLoading} />
+    </TabsContent>
 
-          <TabsContent value="charts">
-            <ExpenseCharts expenses={expenses || []} />
-          </TabsContent>
+    <TabsContent value="charts">
+      <ExpenseCharts
+        expenses={
+          (expenses || []).map(exp =>
+            ({
+              ...exp,
+              dataVencimento: exp.dataVencimento ?? '',
+              subcategoria: exp.subcategoria ?? '',
+              status: exp.status ?? 'pendente',
+              createdAt: exp.createdAt ?? null
+            })
+          )
+        }
+      />
+    </TabsContent>
 
-          <TabsContent value="reports">
-            <ExpenseReports expenses={expenses || []} />
-          </TabsContent>
-        </Tabs>
-      </main>
+    <TabsContent value="reports">
+      <ExpenseReports expenses={expenses || []} />
+    </TabsContent>
+  </Tabs>
+</main>
     </div>
   );
 };

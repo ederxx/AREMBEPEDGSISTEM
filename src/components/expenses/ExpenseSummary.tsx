@@ -7,9 +7,9 @@ interface ExpenseSummaryProps {
 }
 
 const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
-  // Função para calcular o status, igual no seu componente ExpensesList
+  const hoje = new Date();
+
   const calculateStatus = (expense: Expense): 'pago' | 'pendente' | 'vencido' => {
-    const hoje = new Date();
     const vencimento = new Date(expense.dataVencimento);
     const pagamento = expense.dataPagamento ? new Date(expense.dataPagamento) : null;
 
@@ -19,54 +19,90 @@ const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
     return 'pendente';
   };
 
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.valor, 0) || 0;
+  // Classificar as despesas
+  const classified = expenses.reduce(
+    (acc, expense) => {
+      const status = calculateStatus(expense);
+      acc.total += expense.valor;
 
-  // Agora filtro com base no status calculado na hora
-  const pendingExpenses = expenses.filter((e) => calculateStatus(e) === 'pendente');
-  const overdueExpenses = expenses.filter((e) => calculateStatus(e) === 'vencido');
-  const paidExpenses = expenses.filter((e) => calculateStatus(e) === 'pago');
+      if (status === 'pendente') {
+        acc.pendentes.count += 1;
+        acc.pendentes.total += expense.valor;
+      } else if (status === 'vencido') {
+        acc.vencidas.count += 1;
+        acc.vencidas.total += expense.valor;
+      } else if (status === 'pago') {
+        acc.pagas.count += 1;
+        acc.pagas.total += expense.valor;
+      }
+
+      return acc;
+    },
+    {
+      total: 0,
+      pendentes: { count: 0, total: 0 },
+      vencidas: { count: 0, total: 0 },
+      pagas: { count: 0, total: 0 },
+    }
+  );
+
+  const formatCurrency = (value: number) =>
+    value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <div className="grid md:grid-cols-4 gap-6 mb-8">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">Total Gasto</CardTitle>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
-            R$ {totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          <div className="text-2xl font-bold">{formatCurrency(classified.total)}</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
+          <FileText className="h-4 w-4 text-yellow-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-xl font-bold text-yellow-600">
+            {classified.pendentes.count} despesa(s)
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {formatCurrency(classified.pendentes.total)}
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
-          <FileText className="h-4 w-4 text-yellow-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-yellow-600">{pendingExpenses.length}</div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">Vencidas</CardTitle>
           <AlertCircle className="h-4 w-4 text-red-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-red-600">{overdueExpenses.length}</div>
+          <div className="text-xl font-bold text-red-600">
+            {classified.vencidas.count} despesa(s)
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {formatCurrency(classified.vencidas.total)}
+          </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">Pagas</CardTitle>
           <TrendingUp className="h-4 w-4 text-green-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">{paidExpenses.length}</div>
+          <div className="text-xl font-bold text-green-600">
+            {classified.pagas.count} despesa(s)
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {formatCurrency(classified.pagas.total)}
+          </div>
         </CardContent>
       </Card>
     </div>

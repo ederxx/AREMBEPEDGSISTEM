@@ -37,7 +37,8 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
     subcategoria: '',
     placa: '',
     empresa: '',
-    formaPagamento: '', // ✅ novo campo
+    formaPagamento: '', 
+      funcionario: '',// ✅ novo campo
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,7 +66,8 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
         subcategoria: '',
         placa: '',
         empresa: '',
-        formaPagamento: '', // reset também aqui
+        formaPagamento: '',
+        funcionario: '' // reset também aqui
       });
 
       setIsSubmitting(false);
@@ -106,9 +108,9 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
       finalName = `${formData.nome} - ${formData.placa}`;
     }
 
-    if (formData.categoria === 'funcionarios' && formData.placa) {
-      finalName = `${formData.placa} - ${formData.nome}`;
-    }
+  if (formData.categoria === 'funcionarios' && formData.funcionario) {
+  finalName = `${formData.funcionario} - ${formData.nome}`;
+}
 
    const expenseData = {
   nome: formData.nome,
@@ -119,7 +121,7 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
   formaPagamento: formData.formaPagamento,
   dataVencimento: formData.dataVencimento ? format(formData.dataVencimento, 'yyyy-MM-dd') : undefined,
   dataPagamento: formData.dataPagamento ? format(formData.dataPagamento, 'yyyy-MM-dd') : undefined,
-
+funcionario: formData.funcionario || null, // opcional
   userId: user?.uid || '',           // salva o uid do usuário
   userName: user?.displayName || '', // salva o nome do usuário
 
@@ -137,216 +139,224 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
     if (!formData.categoria) return [];
     return EXPENSE_CATEGORIES[formData.categoria as keyof typeof EXPENSE_CATEGORIES]?.subcategories || [];
   };
-
+console.log('Funcionários disponíveis:', employeeNames);
   return (
     <Card>
       <CardHeader>
         <CardTitle>Nova Despesa</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label>Categoria *</Label>
-              <Select
-                value={formData.categoria}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, categoria: value, subcategoria: '' })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(EXPENSE_CATEGORIES).map(([key, cat]) => (
-                    <SelectItem key={key} value={key}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+       <form onSubmit={handleSubmit} className="space-y-6">
+  {/* Categoria / Subcategoria */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <Label>Categoria *</Label>
+      <Select
+        value={formData.categoria}
+        onValueChange={(value) =>
+          setFormData({ ...formData, categoria: value, subcategoria: '' })
+        }
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione a categoria" />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(EXPENSE_CATEGORIES).map(([key, cat]) => (
+            <SelectItem key={key} value={key}>
+              {cat.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
 
-            <div>
-              <Label>Subcategoria *</Label>
-              <Select
-                value={formData.subcategoria}
-                onValueChange={(value) => setFormData({ ...formData, subcategoria: value })}
-                disabled={!formData.categoria}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a subcategoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getSubcategories().map((sub) => (
-                    <SelectItem key={sub} value={sub}>
-                      {sub}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+    <div>
+      <Label>Subcategoria *</Label>
+      <Select
+        value={formData.subcategoria}
+        onValueChange={(value) => setFormData({ ...formData, subcategoria: value })}
+        disabled={!formData.categoria}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione a subcategoria" />
+        </SelectTrigger>
+        <SelectContent>
+          {getSubcategories().map((sub) => (
+            <SelectItem key={sub} value={sub}>
+              {sub}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
 
-          {formData.categoria === 'veiculo' && (
-            <div>
-              <Label>Placa do Veículo</Label>
-              <Select
-                value={formData.placa}
-                onValueChange={(value) => setFormData({ ...formData, placa: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a placa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vehiclePlates.map((placa) => (
-                    <SelectItem key={placa} value={placa}>
-                      {placa}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+  {/* Veículo ou Funcionário */}
+  {formData.categoria === 'veiculo' && (
+    <div>
+      <Label>Placa do Veículo</Label>
+      <Select
+        value={formData.placa}
+        onValueChange={(value) => setFormData({ ...formData, placa: value })}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione a placa" />
+        </SelectTrigger>
+        <SelectContent>
+          {vehiclePlates.map((placa) => (
+            <SelectItem key={placa} value={placa}>
+              {placa}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )}
 
-          {formData.categoria === 'funcionarios' && (
-            <div>
-              <Label>Nome do Funcionário</Label>
-              <Select
-                value={formData.placa}
-                onValueChange={(value) => setFormData({ ...formData, placa: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o funcionário" />
-                </SelectTrigger>
-                <SelectContent>
-                  {employeeNames.map((nome) => (
-                    <SelectItem key={nome} value={nome}>
-                      {nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+ {formData.categoria === 'funcionarios' && (
+  <div>
+    <Label>Nome do Funcionário</Label>
+    <Select
+      value={formData.funcionario}
+      onValueChange={(value) => setFormData({ ...formData, funcionario: value })}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder="Selecione o funcionário" />
+      </SelectTrigger>
+      <SelectContent>
+        {employeeNames.map((nome) => (
+          <SelectItem key={nome} value={nome}>
+            {nome}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+)}
 
-          <div>
-            <Label>Empresa *</Label>
-            <Select
-              value={formData.empresa}
-              onValueChange={(value) => setFormData({ ...formData, empresa: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Arembepe Turismo">Arembepe Turismo</SelectItem>
-                <SelectItem value="DG Transportes">DG Transportes</SelectItem>
-                <SelectItem value="Terceirizado">Terceirizado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+  {/* Empresa / Forma Pagamento */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <Label>Empresa *</Label>
+      <Select
+        value={formData.empresa}
+        onValueChange={(value) => setFormData({ ...formData, empresa: value })}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione a empresa" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="Arembepe Turismo">Arembepe Turismo</SelectItem>
+          <SelectItem value="DG Transportes">DG Transportes</SelectItem>
+          <SelectItem value="Terceirizado">Terceirizado</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
 
-          <div>
-            <Label>Forma de Pagamento *</Label>
-            <Select
-              value={formData.formaPagamento}
-              onValueChange={(value) => setFormData({ ...formData, formaPagamento: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a forma de pagamento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Bradesco">Bradesco</SelectItem>
-                <SelectItem value="Brasil">Brasil</SelectItem>
-                <SelectItem value="Pix">Pix</SelectItem>
-                <SelectItem value="À Vista">À Vista</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <div>
+      <Label>Forma de Pagamento *</Label>
+      <Select
+        value={formData.formaPagamento}
+        onValueChange={(value) => setFormData({ ...formData, formaPagamento: value })}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione a forma de pagamento" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="Bradesco">Bradesco</SelectItem>
+          <SelectItem value="Brasil">Brasil</SelectItem>
+          <SelectItem value="Pix">Pix</SelectItem>
+          <SelectItem value="À Vista">À Vista</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
 
-          <div>
-            <Label>Nome da Despesa *</Label>
-            <Input
-              value={formData.nome}
-              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-              placeholder="Ex: Conta de luz, Seguro do veículo..."
-            />
-          </div>
+  {/* Nome da Despesa */}
+  <div>
+    <Label>Nome da Despesa *</Label>
+    <Input
+      value={formData.nome}
+      onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+      placeholder="Ex: Conta de luz, Seguro do veículo..."
+    />
+  </div>
 
-          <div className="grid md:grid-cols-3 gap-4">
-            <div>
-              <Label>Data de Vencimento *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'w-full justify-start text-left font-normal',
-                      !formData.dataVencimento && 'text-muted-foreground'
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.dataVencimento
-                      ? format(formData.dataVencimento, 'dd/MM/yyyy', { locale: ptBR })
-                      : 'Selecionar data'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={formData.dataVencimento}
-                    onSelect={(date) => setFormData({ ...formData, dataVencimento: date })}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div>
-              <Label>Data de Pagamento</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'w-full justify-start text-left font-normal',
-                      !formData.dataPagamento && 'text-muted-foreground'
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.dataPagamento
-                      ? format(formData.dataPagamento, 'dd/MM/yyyy', { locale: ptBR })
-                      : 'Selecionar data'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={formData.dataPagamento}
-                    onSelect={(date) => setFormData({ ...formData, dataPagamento: date })}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          <div>
-            <Label>Valor *</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={formData.valor}
-              onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
-              placeholder="0,00"
-            />
-          </div>
-
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Salvando...' : 'Salvar Despesa'}
+  {/* Datas e Valor */}
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div>
+      <Label>Data de Vencimento *</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              'w-full justify-start text-left font-normal',
+              !formData.dataVencimento && 'text-muted-foreground'
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {formData.dataVencimento
+              ? format(formData.dataVencimento, 'dd/MM/yyyy', { locale: ptBR })
+              : 'Selecionar data'}
           </Button>
-        </form>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={formData.dataVencimento}
+            onSelect={(date) => setFormData({ ...formData, dataVencimento: date })}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+
+    <div>
+      <Label>Data de Pagamento</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              'w-full justify-start text-left font-normal',
+              !formData.dataPagamento && 'text-muted-foreground'
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {formData.dataPagamento
+              ? format(formData.dataPagamento, 'dd/MM/yyyy', { locale: ptBR })
+              : 'Selecionar data'}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={formData.dataPagamento}
+            onSelect={(date) => setFormData({ ...formData, dataPagamento: date })}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+
+    <div>
+      <Label>Valor *</Label>
+      <Input
+        type="number"
+        step="0.01"
+        value={formData.valor}
+        onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+        placeholder="0,00"
+      />
+    </div>
+  </div>
+
+  {/* Botão */}
+  <Button type="submit" className="w-full" disabled={isSubmitting}>
+    {isSubmitting ? 'Salvando...' : 'Salvar Despesa'}
+  </Button>
+</form>
       </CardContent>
     </Card>
   );

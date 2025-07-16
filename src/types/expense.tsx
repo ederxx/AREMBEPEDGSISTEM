@@ -9,6 +9,8 @@ export interface Expense {
   dataVencimento?: string; // ISO string
   dataPagamento?: string; // ISO string
   userId?: string;
+    createdAt?: any;
+  status?: 'pendente' | 'pago' | 'vencido';
 }
 
 export interface ExpenseFormData {
@@ -20,6 +22,7 @@ export interface ExpenseFormData {
   subcategoria: string;
   placa: string; 
   empresa: string;
-  formaPagamento: string // adiciona aqui para tipar bem a empresa
+  formaPagamento: string;
+    funcionario: string; // adiciona aqui para tipar bem a empresa
 // placa do veículo ou nome do funcionário
 }
