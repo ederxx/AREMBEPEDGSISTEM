@@ -471,11 +471,14 @@ const { user } = useAuth();
                       <TableCell className="font-medium">{expense.nome}</TableCell>
                       <TableCell>{CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES]}</TableCell>
                       <TableCell>{expense.subcategoria || '-'}</TableCell>
-                      <TableCell>{parse(expense.dataVencimento, 'yyyy-MM-dd', new Date()).toLocaleDateString('pt-BR')
-}</TableCell>
-                      <TableCell>{expense.dataPagamento 
-  ? parse(expense.dataPagamento, 'yyyy-MM-dd', new Date()).toLocaleDateString('pt-BR') 
-  : '-'}</TableCell>
+                    <TableCell>
+  {parse(expense.dataVencimento, 'yyyy-MM-dd', new Date()).toLocaleDateString('pt-BR')}
+</TableCell>
+<TableCell>
+  {expense.dataPagamento 
+    ? parse(expense.dataPagamento, 'yyyy-MM-dd', new Date()).toLocaleDateString('pt-BR') 
+    : '-'}
+</TableCell>
                       <TableCell className="font-medium">R$ {expense.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>{expense.empresa || '-'}</TableCell>
                       <TableCell>{expense.formaPagamento || '-'}</TableCell>
