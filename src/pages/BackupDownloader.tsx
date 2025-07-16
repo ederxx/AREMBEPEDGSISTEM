@@ -3,21 +3,36 @@ import { Button } from '@/components/ui/button';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { useAuth } from '@/hooks/useAuth';
+import { Input } from '@/components/ui/input'; // certifique-se que esse componente existe
 
 const BackupDownloader = () => {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
- const { user } = useAuth();
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [password, setPassword] = useState('');
+  const { user } = useAuth();
+
+  const CORRECT_PASSWORD = '254923Ea';
+
+  const handlePasswordSubmit = async () => {
+    if (password !== CORRECT_PASSWORD) {
+      setStatus('❌ Senha incorreta.');
+      return;
+    }
+    await downloadBackup();
+  };
+
   const downloadBackup = async () => {
     if (!user) {
       setStatus('Você precisa estar logado para fazer backup.');
       return;
-    } setLoading(true);
+    }
+
+    setLoading(true);
     setStatus('Coletando dados...');
 
     try {
-      // 🔁 Coleções do seu Firestore (adicione ou remova conforme necessário)
-      const collectionNames = ['vehicles', 'drivers', 'services', 'quotes','depositos', 'expenses', 'garages', ];
+      const collectionNames = ['vehicles', 'drivers', 'services', 'quotes', 'depositos', 'expenses', 'garages'];
       const backupData: Record<string, any[]> = {};
 
       for (const colName of collectionNames) {
@@ -29,7 +44,6 @@ const BackupDownloader = () => {
         backupData[colName] = docs;
       }
 
-      // 📦 Criar o JSON e iniciar download
       const json = JSON.stringify(backupData, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -46,14 +60,31 @@ const BackupDownloader = () => {
       setStatus('❌ Erro ao gerar backup.');
     } finally {
       setLoading(false);
+      setShowPasswordInput(false);
+      setPassword('');
     }
   };
 
   return (
     <div className="space-y-4">
-      <Button onClick={downloadBackup} disabled={loading}>
-        {loading ? 'Gerando Backup...' : 'Baixar Backup do Firestore'}
-      </Button>
+      {showPasswordInput ? (
+        <div className="space-y-2">
+          <Input
+            type="password"
+            placeholder="Digite a senha"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <Button onClick={handlePasswordSubmit} disabled={loading}>
+            {loading ? 'Verificando...' : 'Confirmar senha e baixar'}
+          </Button>
+        </div>
+      ) : (
+        <Button onClick={() => setShowPasswordInput(true)} disabled={loading}>
+          {loading ? 'Gerando Backup...' : 'Baixar Backup do Firestore'}
+        </Button>
+      )}
+
       {status && <p className="text-sm text-muted-foreground">{status}</p>}
     </div>
   );
