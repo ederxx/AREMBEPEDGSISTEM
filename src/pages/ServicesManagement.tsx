@@ -67,7 +67,8 @@ const ServicesManagement = () => {
     queryKey: ['services'],
     queryFn: async () => {
       const snapshot = await getDocs(collection(db, 'services'));
-      return snapshot.docs.map(doc => {
+      return snapshot.docs
+      .map(doc => {
         const data = doc.data();
         return {
           id: doc.id,

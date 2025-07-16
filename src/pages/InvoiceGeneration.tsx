@@ -15,25 +15,20 @@ import { useToast } from '@/hooks/use-toast';
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-
-
+// Função para carregar imagem como Base64
 const getImageBase64 = (url: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'Anonymous'; // importantíssimo para evitar erro CORS
+    img.crossOrigin = 'Anonymous';
     img.src = url;
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject('Canvas context error');
-        return;
-      }
+      if (!ctx) return reject('Erro no contexto do canvas');
       ctx.drawImage(img, 0, 0);
-      const dataURL = canvas.toDataURL('image/png');
-      resolve(dataURL);
+      resolve(canvas.toDataURL('image/png'));
     };
     img.onerror = (err) => reject(err);
   });
@@ -43,6 +38,7 @@ const InvoiceGeneration = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [bankData, setBankData] = useState({
     banco: '',
@@ -52,23 +48,24 @@ const InvoiceGeneration = () => {
   });
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-    }
+    if (!user) navigate('/auth');
   }, [user, navigate]);
 
+  // ✅ Consulta corrigida
   const { data: services, isLoading } = useQuery({
-    queryKey: ['unfaturated-services'],
-    queryFn: async () => {
-      const q = query(collection(db, 'services'), where('faturado', '==', false));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as { valorFinal?: number } }));
-    }
+    queryKey: ['unbilled-services'], // Correção aqui
+queryFn: async () => {
+  const snapshot = await getDocs(collection(db, 'services'));
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() as any }))
+    .filter(service => service.status === 'finalizado');
+},
+    enabled: !!user
   });
 
   const handleServiceToggle = (serviceId: string) => {
-    setSelectedServices(prev => 
-      prev.includes(serviceId) 
+    setSelectedServices(prev =>
+      prev.includes(serviceId)
         ? prev.filter(id => id !== serviceId)
         : [...prev, serviceId]
     );
@@ -82,84 +79,11 @@ const InvoiceGeneration = () => {
     }
   };
 
-  const generateInvoice = async () => {
-    if (selectedServices.length === 0) {
-      toast({
-        title: "Erro",
-        description: "Selecione pelo menos um serviço para gerar a fatura.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!bankData.banco || !bankData.agencia || !bankData.conta) {
-      toast({
-        title: "Erro",
-        description: "Preencha os dados bancários para gerar a fatura.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const doc = new jsPDF();
-
-   try {
-    // troque pela URL da sua imagem hospedada em algum lugar acessível na web
-    const logoUrl = 'https://i.imgur.com/filHQ4A.jpeg'; 
-    const logoBase64 = await getImageBase64(logoUrl);
-    doc.addImage(logoBase64, 'PNG', 14, 10, 50, 20);
-  } catch (error) {
-    console.error('Erro ao carregar imagem:', error);
-  }
-
-    // Título
-    doc.setFontSize(20);
-    doc.text("FATURA DE SERVIÇOS", 105, 40, { align: "center" });
-
-    // Dados bancários
-    doc.setFontSize(12);
-    doc.text(`Banco: ${bankData.banco}`, 14, 55);
-    doc.text(`Agência: ${bankData.agencia}`, 14, 62);
-    doc.text(`Conta: ${bankData.conta}`, 14, 69);
-    if (bankData.pix) doc.text(`PIX: ${bankData.pix}`, 14, 76);
-
-    // Tabela de serviços
-    autoTable(doc, {
-      startY: 85,
-      head: [["Empresa", "Data", "Valor"]],
-      body: selectedServicesData.map(s => [
-        s.nomeEmpresa,
-        formatDate(s.dataInicio),
-        formatCurrency(s.valorFinal || 0)
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: [13, 148, 136] },
-      styles: { fontSize: 11 }
-    });
-
-    // Total
-    const finalY = doc.lastAutoTable.finalY || 100;
-    doc.setFontSize(14);
-    doc.text(`Total: ${formatCurrency(totalValue)}`, 14, finalY + 15);
-
-    // Salvar PDF
-    doc.save(`fatura-${new Date().toISOString().slice(0,10)}.pdf`);
-
-    toast({
-      title: "Sucesso",
-      description: "Fatura PDF gerada com sucesso!",
-    });
-  };
-
   const selectedServicesData = services?.filter(service => selectedServices.includes(service.id)) || [];
-  const totalValue = selectedServicesData.reduce((sum, service) => sum + (service.valorFinal || 0), 0);
+  const totalValue = selectedServicesData.reduce((sum, s) => sum + (s.valorFinal || 0), 0);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  };
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -168,6 +92,57 @@ const InvoiceGeneration = () => {
     } catch {
       return dateString;
     }
+  };
+
+  const generateInvoice = async () => {
+    if (selectedServices.length === 0) {
+      toast({ title: 'Erro', description: 'Selecione serviços.', variant: 'destructive' });
+      return;
+    }
+
+    if (!bankData.banco || !bankData.agencia || !bankData.conta) {
+      toast({ title: 'Erro', description: 'Preencha os dados bancários.', variant: 'destructive' });
+      return;
+    }
+
+    const doc = new jsPDF();
+
+    try {
+      const logoBase64 = await getImageBase64('https://i.imgur.com/filHQ4A.jpeg');
+      doc.addImage(logoBase64, 'PNG', 14, 10, 50, 20);
+    } catch (err) {
+      console.warn('Erro ao carregar logo:', err);
+    }
+
+    doc.setFontSize(20);
+    doc.text("FATURA DE SERVIÇOS", 105, 40, { align: "center" });
+
+    doc.setFontSize(12);
+    doc.text(`Banco: ${bankData.banco}`, 14, 55);
+    doc.text(`Agência: ${bankData.agencia}`, 14, 62);
+    doc.text(`Conta: ${bankData.conta}`, 14, 69);
+    if (bankData.pix) doc.text(`PIX: ${bankData.pix}`, 14, 76);
+
+    autoTable(doc, {
+      startY: 85,
+      head: [["Empresa", "Data", "Valor"]],
+      body: selectedServicesData.map(s => [
+        s.nomeEmpresa || '—',
+        formatDate(s.dataInicio),
+        formatCurrency(s.valorFinal || 0)
+      ]),
+      theme: "grid",
+      headStyles: { fillColor: [13, 148, 136] },
+      styles: { fontSize: 11 }
+    });
+
+    const finalY = doc.lastAutoTable.finalY || 100;
+    doc.setFontSize(14);
+    doc.text(`Total: ${formatCurrency(totalValue)}`, 14, finalY + 15);
+
+    doc.save(`fatura-${new Date().toISOString().slice(0,10)}.pdf`);
+
+    toast({ title: 'Sucesso', description: 'Fatura gerada com sucesso!' });
   };
 
   if (!user) return null;
@@ -179,10 +154,9 @@ const InvoiceGeneration = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Voltar
+                <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
               </Button>
-              <h1 className="text-2xl font-bold text-teal-primary">Geração de Faturas</h1>
+              <h1 className="text-2xl font-bold text-teal-600">Geração de Faturas</h1>
             </div>
           </div>
         </div>
@@ -190,6 +164,7 @@ const InvoiceGeneration = () => {
 
       <main className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-2 gap-8">
+          {/* Lista de Serviços */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -200,73 +175,44 @@ const InvoiceGeneration = () => {
             <CardContent>
               {isLoading ? (
                 <p>Carregando...</p>
-              ) : services && services.length > 0 ? (
+              ) : services?.length ? (
                 <>
-                  <div className="mb-4">
-                    <Button 
-                      variant="outline" 
-                      onClick={handleSelectAll}
-                      className="mb-4"
-                    >
-                      {selectedServices.length === services.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
-                    </Button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12">
+                  <Button variant="outline" onClick={handleSelectAll} className="mb-4">
+                    {selectedServices.length === services.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                  </Button>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead><Checkbox checked={selectedServices.length === services.length} onCheckedChange={handleSelectAll} /></TableHead>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {services.map(service => (
+                        <TableRow key={service.id}>
+                          <TableCell>
                             <Checkbox 
-                              checked={selectedServices.length === services.length}
-                              onCheckedChange={handleSelectAll}
+                              checked={selectedServices.includes(service.id)}
+                              onCheckedChange={() => handleServiceToggle(service.id)}
                             />
-                          </TableHead>
-                          <TableHead>Empresa</TableHead>
-                          <TableHead>Data</TableHead>
-                          <TableHead>Valor</TableHead>
+                          </TableCell>
+                          <TableCell>{service.nomeEmpresa || '—'}</TableCell>
+                          <TableCell>{formatDate(service.dataInicio)}</TableCell>
+                          <TableCell>{formatCurrency(service.valorFinal || 0)}</TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {services.map((service: { 
-                          id: string; 
-                          nomeEmpresa: string; 
-                          dataInicio: string; 
-                          valorFinal?: number; 
-                        }) => (
-                          <TableRow key={service.id}>
-                            <TableCell>
-                              <Checkbox 
-                                checked={selectedServices.includes(service.id)}
-                                onCheckedChange={() => handleServiceToggle(service.id)}
-                              />
-                            </TableCell>
-                            <TableCell className="font-medium">{service.nomeEmpresa}</TableCell>
-                            <TableCell>{formatDate(service.dataInicio)}</TableCell>
-                            <TableCell>{formatCurrency(service.valorFinal || 0)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  {selectedServices.length > 0 && (
-                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                      <p className="font-medium">
-                        Total selecionado: {formatCurrency(totalValue)}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {selectedServices.length} serviço(s) selecionado(s)
-                      </p>
-                    </div>
-                  )}
+                      ))}
+                    </TableBody>
+                  </Table>
                 </>
               ) : (
-                <p className="text-center py-8 text-gray-500">
-                  Todos os serviços já foram faturados.
-                </p>
+                <p className="text-center py-8 text-gray-500">Nenhum serviço pendente de faturamento.</p>
               )}
             </CardContent>
           </Card>
 
+          {/* Dados Bancários */}
           <Card>
             <CardHeader>
               <CardTitle>Dados Bancários</CardTitle>
@@ -275,45 +221,21 @@ const InvoiceGeneration = () => {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="banco">Banco</Label>
-                  <Input
-                    id="banco"
-                    value={bankData.banco}
-                    onChange={(e) => setBankData({ ...bankData, banco: e.target.value })}
-                    placeholder="Nome do banco"
-                  />
+                  <Input id="banco" value={bankData.banco} onChange={e => setBankData({ ...bankData, banco: e.target.value })} />
                 </div>
                 <div>
                   <Label htmlFor="agencia">Agência</Label>
-                  <Input
-                    id="agencia"
-                    value={bankData.agencia}
-                    onChange={(e) => setBankData({ ...bankData, agencia: e.target.value })}
-                    placeholder="Número da agência"
-                  />
+                  <Input id="agencia" value={bankData.agencia} onChange={e => setBankData({ ...bankData, agencia: e.target.value })} />
                 </div>
                 <div>
                   <Label htmlFor="conta">Conta</Label>
-                  <Input
-                    id="conta"
-                    value={bankData.conta}
-                    onChange={(e) => setBankData({ ...bankData, conta: e.target.value })}
-                    placeholder="Número da conta"
-                  />
+                  <Input id="conta" value={bankData.conta} onChange={e => setBankData({ ...bankData, conta: e.target.value })} />
                 </div>
                 <div>
                   <Label htmlFor="pix">PIX (opcional)</Label>
-                  <Input
-                    id="pix"
-                    value={bankData.pix}
-                    onChange={(e) => setBankData({ ...bankData, pix: e.target.value })}
-                    placeholder="Chave PIX"
-                  />
+                  <Input id="pix" value={bankData.pix} onChange={e => setBankData({ ...bankData, pix: e.target.value })} />
                 </div>
-                <Button 
-                  onClick={generateInvoice}
-                  className="w-full"
-                  disabled={selectedServices.length === 0}
-                >
+                <Button onClick={generateInvoice} className="w-full" disabled={selectedServices.length === 0}>
                   <Download className="w-4 h-4 mr-2" />
                   Gerar Fatura PDF
                 </Button>

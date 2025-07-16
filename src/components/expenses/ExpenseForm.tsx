@@ -38,7 +38,8 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
     placa: '',
     empresa: '',
     formaPagamento: '', 
-      funcionario: '',// ✅ novo campo
+      funcionario: '',
+      recorrente: false,// ✅ novo campo
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,7 +60,7 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
 
       setFormData({
         nome: '',
-        dataVencimento: undefined,
+        dataVencimento: undefined, 
         dataPagamento: undefined,
         valor: '',
         categoria: '',
@@ -67,7 +68,8 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
         placa: '',
         empresa: '',
         formaPagamento: '',
-        funcionario: '' // reset também aqui
+        funcionario: '',
+         recorrente: false // reset também aqui
       });
 
       setIsSubmitting(false);
@@ -127,6 +129,59 @@ funcionario: formData.funcionario || null, // opcional
 
   createdAt: new Date().toISOString(),
 };
+if (formData.recorrente) {
+  setIsSubmitting(true);
+  try {
+    // Lançar uma despesa para cada um dos 12 meses
+    for (let i = 0; i < 12; i++) {
+      const dataVencimentoMes = new Date(formData.dataVencimento!);
+      dataVencimentoMes.setMonth(dataVencimentoMes.getMonth() + i);
+
+      const expenseData = {
+        nome: formData.nome,
+        valor: parseFloat(formData.valor),
+        categoria: formData.categoria,
+        subcategoria: formData.subcategoria,
+        empresa: formData.empresa,
+        formaPagamento: formData.formaPagamento,
+        dataVencimento: format(dataVencimentoMes, 'yyyy-MM-dd'),
+        dataPagamento: null,
+        funcionario: formData.funcionario || null,
+        status: 'pendente', // Força pendente
+        recorrente: true,
+        mesReferencia: format(dataVencimentoMes, 'MM/yyyy'),
+        userId: user?.uid || '',
+        userName: user?.displayName || '',
+        createdAt: new Date().toISOString(),
+      };
+
+      await addExpenseMutation.mutateAsync(expenseData);
+    }
+    toast({ title: 'Despesas recorrentes adicionadas com sucesso!' });
+
+    setFormData({
+      nome: '',
+      dataVencimento: undefined,
+      dataPagamento: undefined,
+      valor: '',
+      categoria: '',
+      subcategoria: '',
+      placa: '',
+      empresa: '',
+      formaPagamento: '',
+      funcionario: '',
+      recorrente: false,
+    });
+  } catch (error) {
+    toast({
+      title: 'Erro ao adicionar despesas recorrentes',
+      variant: 'destructive',
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+  return;
+}
 
     try {
       await addExpenseMutation.mutateAsync(expenseData);
@@ -351,6 +406,15 @@ console.log('Funcionários disponíveis:', employeeNames);
       />
     </div>
   </div>
+  <div className="flex items-center space-x-2">
+  <input
+    type="checkbox"
+    id="recorrente"
+    checked={formData.recorrente}
+    onChange={(e) => setFormData({ ...formData, recorrente: e.target.checked })}
+  />
+  <label htmlFor="recorrente" className="text-sm select-none">Despesa Recorrente (12 meses)</label>
+</div>
 
   {/* Botão */}
   <Button type="submit" className="w-full" disabled={isSubmitting}>
