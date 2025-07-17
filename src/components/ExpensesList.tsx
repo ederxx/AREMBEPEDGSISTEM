@@ -42,6 +42,13 @@ import { CATEGORY_NAMES } from '@/constants/expenseCategories';
 import { EditExpenseModal } from '@/components/EditExpenseModal';
 import { useAuth } from '@/hooks/useAuth';
 import { parse } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 
 interface ExpensesListProps {
   expenses: Expense[];
@@ -437,23 +444,23 @@ const { user } = useAuth();
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Despesa</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Subcategoria</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead>Pagamento</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Empresa</TableHead>
-                  <TableHead>Forma de Pagamento</TableHead>
-                  <TableHead>Funcionário</TableHead>
-                  <TableHead>Usuário </TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
+<Table className="text-sm min-w-full">
+            <TableHeader>
+  <TableRow>
+    <TableHead>Status</TableHead>
+    <TableHead>Despesa</TableHead>
+    <TableHead>Categoria</TableHead>
+    {/* REMOVIDO: <TableHead>Subcategoria</TableHead> */}
+    <TableHead>Vencimento</TableHead>
+    <TableHead>Pagamento</TableHead>
+    <TableHead>Valor</TableHead>
+    <TableHead>Empresa</TableHead>
+    <TableHead>Forma de Pagamento</TableHead>
+    <TableHead>Funcionário</TableHead>
+    {/* REMOVIDO: <TableHead>Usuário</TableHead> */}
+    <TableHead>Ações</TableHead>
+  </TableRow>
+</TableHeader>
               <TableBody>
                 {filteredExpenses.map((expense) => {
                   const status = calculateStatus(expense);
@@ -470,7 +477,7 @@ const { user } = useAuth();
                       </TableCell>
                       <TableCell className="font-medium">{expense.nome}</TableCell>
                       <TableCell>{CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES]}</TableCell>
-                      <TableCell>{expense.subcategoria || '-'}</TableCell>
+                      
                     <TableCell>
   {parse(expense.dataVencimento, 'yyyy-MM-dd', new Date()).toLocaleDateString('pt-BR')}
 </TableCell>
@@ -487,72 +494,35 @@ const { user } = useAuth();
                               ? expense.funcionario
                                              : '-'}
                           </TableCell>
-                     <TableCell>{usersMap[expense.userId]?.displayName || 'Desconhecido'}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          {status !== 'pago' && (
-                            editingExpense === expense.id ? (
-                              <div className="flex items-center space-x-2">
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                      <CalendarIcon className="w-4 h-4" />
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                      mode="single"
-                                      selected={paymentDate}
-                                      onSelect={setPaymentDate}
-                                      initialFocus
-                                      className="p-3 pointer-events-auto"
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleMarkAsPaid(expense.id)}
-                                  disabled={markAsPaidMutation.isPending}
-                                >
-                                  Confirmar
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingExpense(null);
-                                    setPaymentDate(undefined);
-                                  }}
-                                >
-                                  Cancelar
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button size="sm" onClick={() => setEditingExpense(expense.id)}>
-                                Marcar como pago
-                              </Button>
-                            )
-                          )}
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => {
-                              setExpenseToEdit(expense);
-                              setIsEditModalOpen(true);
-                            }}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => deleteExpenseMutation.mutate(expense.id)}
-                            disabled={deleteExpenseMutation.isPending}
-                          >
-                            Excluir
-                          </Button>
-                        </div>
-                      </TableCell>
+                    <TableCell>
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="ghost" className="h-8 w-8 p-0">
+        <MoreHorizontal className="h-4 w-4" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end">
+      {status !== 'pago' && (
+        <DropdownMenuItem onClick={() => setEditingExpense(expense.id)}>
+          Marcar como pago
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem
+        onClick={() => {
+          setExpenseToEdit(expense);
+          setIsEditModalOpen(true);
+        }}
+      >
+        Editar
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onClick={() => deleteExpenseMutation.mutate(expense.id)}
+      >
+        Excluir
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</TableCell>
                     </TableRow>
                   );
                 })}

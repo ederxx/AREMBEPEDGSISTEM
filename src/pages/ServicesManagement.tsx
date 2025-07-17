@@ -6,14 +6,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Edit, Trash, Calendar, Car } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, Car, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical, Edit, Trash } from "lucide-react";
+
+
 
 const ServicesManagement = () => {
   const { user } = useAuth();
@@ -27,14 +35,17 @@ const ServicesManagement = () => {
     dataInicio: '',
     dataFim: '',
     tipoCarro: '',
+    motorista: '',
     numeroPassageiros: '',
     localSaida: '',
     localDestino: '',
+    hrServico: '',
     valorFinal: '',
     status: 'pendente',
+    formadePagamento: '',
     observacoes: ''
   });
-
+const [drivers, setDrivers] = useState<any[]>([]);
   // Funções para formatar status e definir cor do Badge
   const formatStatus = (status?: string) => {
     if (!status) return 'Sem status';
@@ -43,9 +54,9 @@ const ServicesManagement = () => {
 
   const getBadgeClass = (status: string) => {
     switch (status) {
-      case 'faturado':
-        return 'bg-green-500 hover:bg-green-600';
       case 'finalizado':
+        return 'bg-green-500 hover:bg-green-600';
+      case 'agendado':
         return 'bg-blue-500 hover:bg-blue-600';
       case 'em_andamento':
         return 'bg-yellow-500 hover:bg-yellow-600 text-black';
@@ -62,7 +73,25 @@ const ServicesManagement = () => {
       navigate('/auth');
     }
   }, [user, navigate]);
+useEffect(() => {
+  const fetchDrivers = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'drivers'));
+      const driverList = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          nome: data.nomeCompleto || 'Sem nome',
+        };
+      });
+      setDrivers(driverList);
+    } catch (error) {
+      console.error("Erro ao buscar motoristas:", error);
+    }
+  };
 
+  fetchDrivers();
+}, []);
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
@@ -171,11 +200,14 @@ const ServicesManagement = () => {
       dataInicio: '',
       dataFim: '',
       tipoCarro: '',
+      motorista: '',
       numeroPassageiros: '',
       localSaida: '',
       localDestino: '',
+      hrServico: '',
       valorFinal: '',
       status: 'pendente',
+      formadePagamento: '',
       observacoes: ''
     });
   };
@@ -204,6 +236,44 @@ const ServicesManagement = () => {
       addServiceMutation.mutate(formData);
     }
   };
+  const handleResumo = (service: any) => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+  const html = `
+    <html>
+      <head>
+        <title>Resumo do Serviço</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { text-align: center; }
+          .info { margin-bottom: 12px; }
+          .label { font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <h1>Ordem de Serviço</h1>
+        <div class="info"><span class="label">Empresa:</span> ${service.nomeEmpresa}</div>
+        <div class="info"><span class="label">Data:</span> ${formatDate(service.dataInicio)} ${service.dataFim ? ` até ${formatDate(service.dataFim)}` : ''}</div>
+        <div class="info"><span class="label">Hora:</span> ${service.hrServico}</div>
+        <div class="info"><span class="label">Veículo:</span> ${service.tipoCarro}</div>
+        <div class="info"><span class="label">Motorista:</span> ${service.motorista}</div>
+        <div class="info"><span class="label">Passageiros:</span> ${service.numeroPassageiros}</div>
+        <div class="info"><span class="label">Local de Saída:</span> ${service.localSaida}</div>
+        <div class="info"><span class="label">Destino:</span> ${service.localDestino}</div>
+        <div class="info"><span class="label">Valor:</span> ${formatCurrency(service.valorFinal)}</div>
+        <div class="info"><span class="label">Forma de Pagamento:</span> ${service.formadePagamento}</div>
+        <div class="info"><span class="label">Status:</span> ${formatStatus(service.status)}</div>
+        <div class="info"><span class="label">Observações:</span> ${service.observacoes || '-'}</div>
+
+        <br><br>
+        <button onclick="window.print()">Imprimir</button>
+      </body>
+    </html>
+  `;
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+};
 
   const handleEdit = (service: any) => {
     setEditingService(service);
@@ -212,11 +282,14 @@ const ServicesManagement = () => {
       dataInicio: service.dataInicio || '',
       dataFim: service.dataFim || '',
       tipoCarro: service.tipoCarro || '',
+      motorista: service.motorista || '',
       numeroPassageiros: service.numeroPassageiros?.toString() || '',
       localSaida: service.localSaida || '',
       localDestino: service.localDestino || '',
+          hrServico: service.hrServico || '',
       valorFinal: service.valorFinal?.toString() || '',
       status: service.status || 'pendente',
+      formadePagamento: service.formadePagamento || '',
       observacoes: service.observacoes || ''
     });
     setShowForm(true);
@@ -299,6 +372,15 @@ const ServicesManagement = () => {
                     onChange={(e) => setFormData({ ...formData, dataFim: e.target.value })}
                   />
                 </div>
+                  <div>
+                  <Label htmlFor="hrServico">Hora do Serviço</Label>
+                  <Input
+                    id="hrServico"
+                    type="time"
+                    value={formData.hrServico}
+                    onChange={(e) => setFormData({ ...formData, hrServico: e.target.value })}
+                  />
+                </div>
                 <div>
                   <Label htmlFor="tipoCarro">Tipo de Carro *</Label>
                   <Select
@@ -317,6 +399,28 @@ const ServicesManagement = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                    <div>
+                  <Label htmlFor="tipoCarro">Motorista *</Label>
+                  <Select
+                    value={formData.motorista}
+                    onValueChange={(value) => setFormData({ ...formData, motorista: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Motorista" />
+                    </SelectTrigger>
+                   <SelectContent>
+                        {drivers.map((driver) => (
+                    <SelectItem key={driver.id} value={driver.nome}>
+                      {driver.nome}
+                    </SelectItem>
+                  ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+
+
+
                 <div>
                   <Label htmlFor="numeroPassageiros">Número de Passageiros *</Label>
                   <Input
@@ -358,6 +462,23 @@ const ServicesManagement = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+  <Label htmlFor="formadePagamento">Forma de Pagamento</Label>
+  <Select
+    value={formData.formadePagamento}
+    onValueChange={(value) =>
+      setFormData({ ...formData, formadePagamento: value })
+    }
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="Selecione a forma de pagamento" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="pago">Pago</SelectItem>
+      <SelectItem value="faturado">Faturado</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
                 <div>
                   <Label htmlFor="localSaida">Local de Saída</Label>
                   <Input
@@ -416,54 +537,76 @@ const ServicesManagement = () => {
             ) : services && services.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Empresa</TableHead>
-                      <TableHead>Período</TableHead>
-                      <TableHead>Veículo</TableHead>
-                      <TableHead>Passageiros</TableHead>
-                      <TableHead>Valor</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                 <TableHeader>
+  <TableRow>
+<TableHead className="w-[80px]">Empresa</TableHead>
+<TableHead className="w-[120px]">Período</TableHead>
+<TableHead className="w-[80px]">Hora</TableHead>
+<TableHead className="min-w-[140px]">Veículo</TableHead>
+<TableHead className="min-w-[140px]">Motorista</TableHead>
+<TableHead className="w-[80px]">Passageiros</TableHead>
+<TableHead className="w-[120px]">Saída</TableHead>
+<TableHead className="w-[120px]">Destino</TableHead>
+<TableHead className="w-[100px]">Valor</TableHead>
+<TableHead className="w-[100px]">Pagamento</TableHead>
+<TableHead className="w-[100px]">Status</TableHead>
+<TableHead className="w-[50px]">Ações</TableHead>
+  </TableRow>
+</TableHeader>
                   <TableBody>
                     {services.map((service: any) => (
-                      <TableRow key={service.id}>
-                        <TableCell className="font-medium">{service.nomeEmpresa}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p>{formatDate(service.dataInicio)}</p>
-                            {service.dataFim && (
-                              <p className="text-sm text-gray-500">até {formatDate(service.dataFim)}</p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{service.tipoCarro}</TableCell>
-                        <TableCell>{service.numeroPassageiros}</TableCell>
-                        <TableCell>{formatCurrency(service.valorFinal || 0)}</TableCell>
-                        <TableCell>
-                          <Badge className={getBadgeClass(service.status)}>
-                            {formatStatus(service.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button size="sm" variant="outline" onClick={() => handleEdit(service)}>
-                              <Edit className="w-4 h-4" />
-                           
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => deleteServiceMutation.mutate(service.id)}
-                              disabled={deleteServiceMutation.isPending}
-                            >
-                              <Trash className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                     <TableRow key={service.id}>
+  <TableCell className="font-medium">{service.nomeEmpresa}</TableCell>
+  <TableCell>
+    {formatDate(service.dataInicio)}
+    {service.dataFim && (
+      <span className="text-sm text-gray-500"> até {formatDate(service.dataFim)}</span>
+    )}
+  </TableCell>
+  <TableCell>{service.hrServico || '-'}</TableCell>
+  <TableCell>{service.tipoCarro}</TableCell>
+  <TableCell>{service.motorista}</TableCell>
+  <TableCell>{service.numeroPassageiros}</TableCell>
+  <TableCell>{service.localSaida}</TableCell>
+  <TableCell>{service.localDestino}</TableCell>
+  <TableCell>{formatCurrency(service.valorFinal || 0)}</TableCell>
+  <TableCell>{service.formadePagamento || '-'}</TableCell>
+  <TableCell>
+    <Badge className={getBadgeClass(service.status)}>
+      {formatStatus(service.status)}
+    </Badge>
+  </TableCell>
+ <TableCell>
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="ghost" className="h-6 w-6 p-0">
+        <MoreVertical className="h-4 w-4" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end">
+  <DropdownMenuItem onClick={() => handleEdit(service)}>
+    <Edit className="mr-2 h-4 w-4" />
+    Editar
+  </DropdownMenuItem>
+
+  <DropdownMenuItem onClick={() => handleResumo(service)}>
+    <FileText className="mr-2 h-4 w-4" />
+    Ordem de Serviço
+  </DropdownMenuItem>
+
+  <DropdownMenuItem
+    onClick={() => deleteServiceMutation.mutate(service.id)}
+    disabled={deleteServiceMutation.isPending}
+    className="text-red-600 focus:text-red-600"
+  >
+    <Trash className="mr-2 h-4 w-4" />
+    Excluir
+  </DropdownMenuItem>
+</DropdownMenuContent>
+  </DropdownMenu>
+</TableCell>
+</TableRow>
+
                     ))}
                   </TableBody>
                 </Table>
