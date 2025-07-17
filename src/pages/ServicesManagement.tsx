@@ -457,7 +457,7 @@ useEffect(() => {
                       <SelectItem value="pendente">Pendente</SelectItem>
                       <SelectItem value="em_andamento">Em andamento</SelectItem>
                       <SelectItem value="finalizado">Finalizado</SelectItem>
-                      <SelectItem value="faturado">Faturado</SelectItem>
+                     
                       <SelectItem value="cancelado">Cancelado</SelectItem>
                     </SelectContent>
                   </Select>
