@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Calendar, Car, FileText } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, Car, FileText, ArrowUp, ArrowDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
@@ -20,8 +20,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Edit, Trash } from "lucide-react";
-
-
 
 const ServicesManagement = () => {
   const { user } = useAuth();
@@ -45,7 +43,13 @@ const ServicesManagement = () => {
     formadePagamento: '',
     observacoes: ''
   });
-const [drivers, setDrivers] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+
+  // --- NOVOS ESTADOS PARA FILTRO E ORDENAÇÃO ---
+  const [filterEmpresa, setFilterEmpresa] = useState('');
+  const [sortField, setSortField] = useState<'nomeEmpresa' | 'dataInicio' | 'valorFinal' | ''>('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
   // Funções para formatar status e definir cor do Badge
   const formatStatus = (status?: string) => {
     if (!status) return 'Sem status';
@@ -73,38 +77,40 @@ const [drivers, setDrivers] = useState<any[]>([]);
       navigate('/auth');
     }
   }, [user, navigate]);
-useEffect(() => {
-  const fetchDrivers = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, 'drivers'));
-      const driverList = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          nome: data.nomeCompleto || 'Sem nome',
-        };
-      });
-      setDrivers(driverList);
-    } catch (error) {
-      console.error("Erro ao buscar motoristas:", error);
-    }
-  };
 
-  fetchDrivers();
-}, []);
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'drivers'));
+        const driverList = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            nome: data.nomeCompleto || 'Sem nome',
+          };
+        });
+        setDrivers(driverList);
+      } catch (error) {
+        console.error("Erro ao buscar motoristas:", error);
+      }
+    };
+
+    fetchDrivers();
+  }, []);
+
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
       const snapshot = await getDocs(collection(db, 'services'));
       return snapshot.docs
-      .map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          status: data.status || 'pendente' // garante que o status sempre tenha um valor
-        };
-      });
+        .map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            status: data.status || 'pendente' // garante que o status sempre tenha um valor
+          };
+        });
     }
   });
 
@@ -316,6 +322,50 @@ useEffect(() => {
 
   if (!user) return null;
 
+
+
+
+
+
+
+ 
+
+  const filteredSortedServices = services
+    ? services
+        .filter(service =>
+          service.nomeEmpresa.toLowerCase().includes(filterEmpresa.toLowerCase())
+        )
+        .sort((a, b) => {
+          if (!sortField) return 0; // sem ordenação
+
+          let aValue = a[sortField];
+          let bValue = b[sortField];
+
+          // Caso campo seja data, converte para Date para comparação
+          if (sortField === 'dataInicio') {
+            aValue = new Date(aValue);
+            bValue = new Date(bValue);
+          }
+
+          if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+          return 0;
+        })
+    : [];
+
+  // Função para alternar ordenação (ao clicar no cabeçalho)
+  const handleSort = (field: 'nomeEmpresa' | 'dataInicio' | 'valorFinal') => {
+    if (sortField === field) {
+      // alterna entre asc e desc
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  if (!user) return null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
@@ -523,90 +573,133 @@ useEffect(() => {
             </CardContent>
           </Card>
         )}
-
-        <Card>
+ <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Calendar className="w-5 h-5 mr-2" />
-              Lista de Serviços
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Calendar className="w-5 h-5 mr-2" />
+                Lista de Serviços
+              </div>
+
+              {/* FILTRO DE NOME DA EMPRESA */}
+              <Input
+                placeholder="Filtrar por empresa..."
+                value={filterEmpresa}
+                onChange={(e) => setFilterEmpresa(e.target.value)}
+                className="w-48"
+              />
             </CardTitle>
           </CardHeader>
+
           <CardContent>
             {isLoading ? (
               <p>Carregando...</p>
-            ) : services && services.length > 0 ? (
+            ) : filteredSortedServices && filteredSortedServices.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
-                 <TableHeader>
-  <TableRow>
-<TableHead className="w-[80px]">Empresa</TableHead>
-<TableHead className="w-[120px]">Período</TableHead>
-<TableHead className="w-[80px]">Hora</TableHead>
-<TableHead className="min-w-[140px]">Veículo</TableHead>
-<TableHead className="min-w-[140px]">Motorista</TableHead>
-<TableHead className="w-[80px]">Passageiros</TableHead>
-<TableHead className="w-[120px]">Saída</TableHead>
-<TableHead className="w-[120px]">Destino</TableHead>
-<TableHead className="w-[100px]">Valor</TableHead>
-<TableHead className="w-[100px]">Pagamento</TableHead>
-<TableHead className="w-[100px]">Status</TableHead>
-<TableHead className="w-[50px]">Ações</TableHead>
-  </TableRow>
-</TableHeader>
+                  <TableHeader>
+                    <TableRow>
+                      {/* Cabeçalhos com ordenação para alguns campos */}
+                      <TableHead
+                        className="w-[80px] cursor-pointer"
+                        onClick={() => handleSort('nomeEmpresa')}
+                      >
+                        Empresa
+                        {sortField === 'nomeEmpresa' &&
+                          (sortOrder === 'asc' ? (
+                            <ArrowUp className="inline w-3 h-3 ml-1" />
+                          ) : (
+                            <ArrowDown className="inline w-3 h-3 ml-1" />
+                          ))}
+                      </TableHead>
+                      <TableHead
+                        className="w-[120px] cursor-pointer"
+                        onClick={() => handleSort('dataInicio')}
+                      >
+                        Período
+                        {sortField === 'dataInicio' &&
+                          (sortOrder === 'asc' ? (
+                            <ArrowUp className="inline w-3 h-3 ml-1" />
+                          ) : (
+                            <ArrowDown className="inline w-3 h-3 ml-1" />
+                          ))}
+                      </TableHead>
+                      <TableHead className="w-[80px]">Hora</TableHead>
+                      <TableHead className="min-w-[140px]">Veículo</TableHead>
+                      <TableHead className="min-w-[140px]">Motorista</TableHead>
+                      <TableHead className="w-[80px]">Passageiros</TableHead>
+                      <TableHead className="w-[120px]">Saída</TableHead>
+                      <TableHead className="w-[120px]">Destino</TableHead>
+                      <TableHead
+                        className="w-[100px] cursor-pointer"
+                        onClick={() => handleSort('valorFinal')}
+                      >
+                        Valor
+                        {sortField === 'valorFinal' &&
+                          (sortOrder === 'asc' ? (
+                            <ArrowUp className="inline w-3 h-3 ml-1" />
+                          ) : (
+                            <ArrowDown className="inline w-3 h-3 ml-1" />
+                          ))}
+                      </TableHead>
+                      <TableHead className="w-[100px]">Pagamento</TableHead>
+                      <TableHead className="w-[100px]">Status</TableHead>
+                      <TableHead className="w-[50px]">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
-                    {services.map((service: any) => (
-                     <TableRow key={service.id}>
-  <TableCell className="font-medium">{service.nomeEmpresa}</TableCell>
-  <TableCell>
-    {formatDate(service.dataInicio)}
-    {service.dataFim && (
-      <span className="text-sm text-gray-500"> até {formatDate(service.dataFim)}</span>
-    )}
-  </TableCell>
-  <TableCell>{service.hrServico || '-'}</TableCell>
-  <TableCell>{service.tipoCarro}</TableCell>
-  <TableCell>{service.motorista}</TableCell>
-  <TableCell>{service.numeroPassageiros}</TableCell>
-  <TableCell>{service.localSaida}</TableCell>
-  <TableCell>{service.localDestino}</TableCell>
-  <TableCell>{formatCurrency(service.valorFinal || 0)}</TableCell>
-  <TableCell>{service.formadePagamento || '-'}</TableCell>
-  <TableCell>
-    <Badge className={getBadgeClass(service.status)}>
-      {formatStatus(service.status)}
-    </Badge>
-  </TableCell>
- <TableCell>
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="ghost" className="h-6 w-6 p-0">
-        <MoreVertical className="h-4 w-4" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-  <DropdownMenuItem onClick={() => handleEdit(service)}>
-    <Edit className="mr-2 h-4 w-4" />
-    Editar
-  </DropdownMenuItem>
+                    {filteredSortedServices.map((service: any) => (
+                      <TableRow key={service.id}>
+                        <TableCell className="font-medium">{service.nomeEmpresa}</TableCell>
+                        <TableCell>
+                          {formatDate(service.dataInicio)}
+                          {service.dataFim && (
+                            <span className="text-sm text-gray-500"> até {formatDate(service.dataFim)}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{service.hrServico || '-'}</TableCell>
+                        <TableCell>{service.tipoCarro}</TableCell>
+                        <TableCell>{service.motorista}</TableCell>
+                        <TableCell>{service.numeroPassageiros}</TableCell>
+                        <TableCell>{service.localSaida}</TableCell>
+                        <TableCell>{service.localDestino}</TableCell>
+                        <TableCell>{formatCurrency(service.valorFinal || 0)}</TableCell>
+                        <TableCell>{service.formadePagamento || '-'}</TableCell>
+                        <TableCell>
+                          <Badge className={getBadgeClass(service.status)}>
+                            {formatStatus(service.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-6 w-6 p-0">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEdit(service)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
 
-  <DropdownMenuItem onClick={() => handleResumo(service)}>
-    <FileText className="mr-2 h-4 w-4" />
-    Ordem de Serviço
-  </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleResumo(service)}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Ordem de Serviço
+                              </DropdownMenuItem>
 
-  <DropdownMenuItem
-    onClick={() => deleteServiceMutation.mutate(service.id)}
-    disabled={deleteServiceMutation.isPending}
-    className="text-red-600 focus:text-red-600"
-  >
-    <Trash className="mr-2 h-4 w-4" />
-    Excluir
-  </DropdownMenuItem>
-</DropdownMenuContent>
-  </DropdownMenu>
-</TableCell>
-</TableRow>
-
+                              <DropdownMenuItem
+                                onClick={() => deleteServiceMutation.mutate(service.id)}
+                                disabled={deleteServiceMutation.isPending}
+                                className="text-red-600 focus:text-red-600"
+                              >
+                                <Trash className="mr-2 h-4 w-4" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
                     ))}
                   </TableBody>
                 </Table>
