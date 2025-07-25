@@ -213,9 +213,8 @@ const Expenses = () => {
 
   <Tabs defaultValue="add" className="space-y-6">
     <TabsList className="grid w-full grid-cols-4">
-         <TabsTrigger value="add">Adicionar Despesa</TabsTrigger>
+      <TabsTrigger value="add">Adicionar Despesa</TabsTrigger>
       <TabsTrigger value="list">Lista de Despesas</TabsTrigger>
-   
       <TabsTrigger value="charts">Análises</TabsTrigger>
       <TabsTrigger value="reports">Relatórios</TabsTrigger>
     </TabsList>

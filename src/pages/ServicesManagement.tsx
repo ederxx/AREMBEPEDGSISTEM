@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Calendar, Car, FileText, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, Car, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
@@ -21,40 +21,175 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Edit, Trash } from "lucide-react";
 
+type Service = {
+  id: string;
+  nomeEmpresa?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  hrServico?: string;
+  tipoCarro?: string;
+  motorista?: string;
+  numeroPassageiros?: number;
+  localSaida?: string;
+  localDestino?: string;
+  valorFinal?: number;
+  formadePagamento?: string;
+  status?: string;
+};
+
 const ServicesManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Estados de formulário, filtros e ordenação
   const [showForm, setShowForm] = useState(false);
-  const [editingService, setEditingService] = useState<any>(null);
-  const [formData, setFormData] = useState({
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [drivers, setDrivers] = useState<{ id: string; nome: string }[]>([]);
+  const [vehicles, setVehicles] = useState<{ id: string; nome?: string }[]>([]);
+
+  const [filtroEmpresa, setFiltroEmpresa] = useState('');
+  const [filtroDataInicio, setFiltroDataInicio] = useState('');
+  const [filtroDataFim, setFiltroDataFim] = useState('');
+  const [ordenarPor, setOrdenarPor] = useState<'dataInicio' | 'valorFinal' | 'nomeEmpresa'>('dataInicio');
+  const [ordemAscendente, setOrdemAscendente] = useState(true);
+
+  // Estado do formData com valores iniciais
+  const initialFormData = {
     nomeEmpresa: '',
     dataInicio: '',
     dataFim: '',
+    hrServico: '',
     tipoCarro: '',
     motorista: '',
-    numeroPassageiros: '',
+    numeroPassageiros: 1,
     localSaida: '',
     localDestino: '',
-    hrServico: '',
-    valorFinal: '',
-    status: 'pendente',
+    valorFinal: 0,
     formadePagamento: '',
-    observacoes: ''
-  });
-  const [drivers, setDrivers] = useState<any[]>([]);
-
-  // --- NOVOS ESTADOS PARA FILTRO E ORDENAÇÃO ---
-  const [filterEmpresa, setFilterEmpresa] = useState('');
-  const [sortField, setSortField] = useState<'nomeEmpresa' | 'dataInicio' | 'valorFinal' | ''>('');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-  // Funções para formatar status e definir cor do Badge
-  const formatStatus = (status?: string) => {
-    if (!status) return 'Sem status';
-    return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
+    status: 'pendente',
   };
+
+  const [formData, setFormData] = useState<typeof initialFormData>(initialFormData);
+
+  useEffect(() => {
+    if (!user) navigate('/auth');
+  }, [user, navigate]);
+
+  // Buscar motoristas
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      const sn = await getDocs(collection(db, 'drivers'));
+      setDrivers(sn.docs.map(d => ({ id: d.id, nome: d.data().nomeCompleto || 'Sem nome' })));
+    };
+    fetchDrivers();
+  }, []);
+
+  // Buscar veículos
+  useEffect(() => {
+    const fetchVehicles = async () => {
+      const sn = await getDocs(collection(db, 'vehicles'));
+      setVehicles(sn.docs.map(d => ({ id: d.id, nome: d.data().nome || 'Sem nome' })));
+    };
+    fetchVehicles();
+  }, []);
+
+  const { data: services, isLoading } = useQuery<Service[]>({
+    queryKey: ['services'],
+    queryFn: async () =>
+      (await getDocs(collection(db, 'services'))).docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        status: doc.data().status || 'pendente',
+      })) as Service[],
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (data: any) =>
+      addDoc(collection(db, 'services'), {
+        ...data,
+        numeroPassageiros: +data.numeroPassageiros,
+        valorFinal: +data.valorFinal,
+        createdAt: new Date().toISOString(),
+      }),
+    onSuccess: () => {
+queryClient.invalidateQueries({ queryKey: ['services'] });      setShowForm(false);
+      setFormData(initialFormData);
+      toast({ title: "Sucesso", description: "Serviço registrado com sucesso." });
+    },
+    onError: () => toast({ title: "Erro", description: "Não foi possível registrar.", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: any) =>
+      updateDoc(doc(db, 'services', id), {
+        ...data,
+        numeroPassageiros: +data.numeroPassageiros,
+        valorFinal: +data.valorFinal,
+        updatedAt: new Date().toISOString(),
+      }),
+    onSuccess: () => {
+queryClient.invalidateQueries({ queryKey: ['services'] });      setShowForm(false);
+      setEditingService(null);
+      setFormData(initialFormData);
+      toast({ title: "Sucesso", description: "Serviço atualizado com sucesso." });
+    },
+    onError: () => toast({ title: "Erro", description: "Não foi possível atualizar.", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => deleteDoc(doc(db, 'services', id)),
+    onSuccess: () => {
+queryClient.invalidateQueries({ queryKey: ['services'] });      toast({ title: "Sucesso", description: "Serviço excluído com sucesso." });
+    },
+    onError: () => toast({ title: "Erro", description: "Não foi possível excluir.", variant: "destructive" }),
+  });
+
+  const resetForm = () => setFormData(initialFormData);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Aqui você pode colocar validações específicas se quiser
+    if (editingService) {
+      updateMutation.mutate({ id: editingService.id, data: formData });
+    } else {
+      addMutation.mutate(formData);
+    }
+  };
+
+  const handleEdit = (svc: Service) => {
+    setEditingService(svc);
+    setFormData({
+      nomeEmpresa: svc.nomeEmpresa || '',
+      dataInicio: svc.dataInicio || '',
+      dataFim: svc.dataFim || '',
+      hrServico: svc.hrServico || '',
+      tipoCarro: svc.tipoCarro || '',
+      motorista: svc.motorista || '',
+      numeroPassageiros: svc.numeroPassageiros || 1,
+      localSaida: svc.localSaida || '',
+      localDestino: svc.localDestino || '',
+      valorFinal: svc.valorFinal || 0,
+      formadePagamento: svc.formadePagamento || '',
+      status: svc.status || 'pendente',
+    });
+    setShowForm(true);
+  };
+
+  const handleResumo = (svc: Service) => {
+    // lógica para gerar resumo ou ordem de serviço
+    alert(`Resumo do serviço para ${svc.nomeEmpresa}`);
+  };
+
+  const formatCurrency = (v: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+  const formatDate = (ds: string) =>
+    ds ? `${ds.split('-')[2]}/${ds.split('-')[1]}/${ds.split('-')[0]}` : '';
+
+  const formatStatus = (s?: string) =>
+    s ? s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ') : 'Sem status';
 
   const getBadgeClass = (status: string) => {
     switch (status) {
@@ -66,301 +201,8 @@ const ServicesManagement = () => {
         return 'bg-yellow-500 hover:bg-yellow-600 text-black';
       case 'cancelado':
         return 'bg-red-500 hover:bg-red-600';
-      case 'pendente':
       default:
         return 'bg-gray-500 hover:bg-gray-600';
-    }
-  };
-
-  useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-    }
-  }, [user, navigate]);
-
-  useEffect(() => {
-    const fetchDrivers = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, 'drivers'));
-        const driverList = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            nome: data.nomeCompleto || 'Sem nome',
-          };
-        });
-        setDrivers(driverList);
-      } catch (error) {
-        console.error("Erro ao buscar motoristas:", error);
-      }
-    };
-
-    fetchDrivers();
-  }, []);
-
-  const { data: services, isLoading } = useQuery({
-    queryKey: ['services'],
-    queryFn: async () => {
-      const snapshot = await getDocs(collection(db, 'services'));
-      return snapshot.docs
-        .map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            status: data.status || 'pendente' // garante que o status sempre tenha um valor
-          };
-        });
-    }
-  });
-
-  const { data: vehicles } = useQuery({
-    queryKey: ['vehicles'],
-    queryFn: async () => {
-      const snapshot = await getDocs(collection(db, 'vehicles'));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
-  });
-
-  const addServiceMutation = useMutation({
-    mutationFn: async (data: any) => {
-      await addDoc(collection(db, 'services'), {
-        ...data,
-        numeroPassageiros: parseInt(data.numeroPassageiros),
-        valorFinal: parseFloat(data.valorFinal),
-        createdAt: new Date().toISOString()
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      setShowForm(false);
-      resetForm();
-      toast({
-        title: "Sucesso",
-        description: "Serviço registrado com sucesso.",
-      });
-    },
-    onError: (error) => {
-      console.error('Erro ao registrar serviço:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao registrar serviço. Tente novamente.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const updateServiceMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      await updateDoc(doc(db, 'services', id), {
-        ...data,
-        numeroPassageiros: parseInt(data.numeroPassageiros),
-        valorFinal: parseFloat(data.valorFinal),
-        updatedAt: new Date().toISOString()
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      setEditingService(null);
-      setShowForm(false);
-      resetForm();
-      toast({
-        title: "Sucesso",
-        description: "Serviço atualizado com sucesso.",
-      });
-    },
-    onError: (error) => {
-      console.error('Erro ao atualizar serviço:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar serviço. Tente novamente.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const deleteServiceMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await deleteDoc(doc(db, 'services', id));
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      toast({
-        title: "Sucesso",
-        description: "Serviço excluído com sucesso.",
-      });
-    },
-    onError: (error) => {
-      console.error('Erro ao excluir serviço:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao excluir serviço. Tente novamente.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const resetForm = () => {
-    setFormData({
-      nomeEmpresa: '',
-      dataInicio: '',
-      dataFim: '',
-      tipoCarro: '',
-      motorista: '',
-      numeroPassageiros: '',
-      localSaida: '',
-      localDestino: '',
-      hrServico: '',
-      valorFinal: '',
-      status: 'pendente',
-      formadePagamento: '',
-      observacoes: ''
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (
-      !formData.nomeEmpresa.trim() ||
-      !formData.dataInicio ||
-      !formData.tipoCarro ||
-      !formData.numeroPassageiros ||
-      !formData.valorFinal
-    ) {
-      toast({
-        title: "Erro",
-        description: "Por favor, preencha todos os campos obrigatórios.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (editingService) {
-      updateServiceMutation.mutate({ id: editingService.id, data: formData });
-    } else {
-      addServiceMutation.mutate(formData);
-    }
-  };
-  const handleResumo = (service: any) => {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return;
-  const html = `
-    <html>
-      <head>
-        <title>Resumo do Serviço</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { text-align: center; }
-          .info { margin-bottom: 12px; }
-          .label { font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <h1>Ordem de Serviço</h1>
-        <div class="info"><span class="label">Empresa:</span> ${service.nomeEmpresa}</div>
-        <div class="info"><span class="label">Data:</span> ${formatDate(service.dataInicio)} ${service.dataFim ? ` até ${formatDate(service.dataFim)}` : ''}</div>
-        <div class="info"><span class="label">Hora:</span> ${service.hrServico}</div>
-        <div class="info"><span class="label">Veículo:</span> ${service.tipoCarro}</div>
-        <div class="info"><span class="label">Motorista:</span> ${service.motorista}</div>
-        <div class="info"><span class="label">Passageiros:</span> ${service.numeroPassageiros}</div>
-        <div class="info"><span class="label">Local de Saída:</span> ${service.localSaida}</div>
-        <div class="info"><span class="label">Destino:</span> ${service.localDestino}</div>
-        <div class="info"><span class="label">Valor:</span> ${formatCurrency(service.valorFinal)}</div>
-        <div class="info"><span class="label">Forma de Pagamento:</span> ${service.formadePagamento}</div>
-        <div class="info"><span class="label">Status:</span> ${formatStatus(service.status)}</div>
-        <div class="info"><span class="label">Observações:</span> ${service.observacoes || '-'}</div>
-
-        <br><br>
-        <button onclick="window.print()">Imprimir</button>
-      </body>
-    </html>
-  `;
-
-  printWindow.document.write(html);
-  printWindow.document.close();
-};
-
-  const handleEdit = (service: any) => {
-    setEditingService(service);
-    setFormData({
-      nomeEmpresa: service.nomeEmpresa || '',
-      dataInicio: service.dataInicio || '',
-      dataFim: service.dataFim || '',
-      tipoCarro: service.tipoCarro || '',
-      motorista: service.motorista || '',
-      numeroPassageiros: service.numeroPassageiros?.toString() || '',
-      localSaida: service.localSaida || '',
-      localDestino: service.localDestino || '',
-          hrServico: service.hrServico || '',
-      valorFinal: service.valorFinal?.toString() || '',
-      status: service.status || 'pendente',
-      formadePagamento: service.formadePagamento || '',
-      observacoes: service.observacoes || ''
-    });
-    setShowForm(true);
-  };
-
-  const handleCancel = () => {
-    setShowForm(false);
-    setEditingService(null);
-    resetForm();
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '';
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
-  };
-
-  if (!user) return null;
-
-
-
-
-
-
-
- 
-
-  const filteredSortedServices = services
-    ? services
-        .filter(service =>
-          service.nomeEmpresa.toLowerCase().includes(filterEmpresa.toLowerCase())
-        )
-        .sort((a, b) => {
-          if (!sortField) return 0; // sem ordenação
-
-          let aValue = a[sortField];
-          let bValue = b[sortField];
-
-          // Caso campo seja data, converte para Date para comparação
-          if (sortField === 'dataInicio') {
-            aValue = new Date(aValue);
-            bValue = new Date(bValue);
-          }
-
-          if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-          if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-          return 0;
-        })
-    : [];
-
-  // Função para alternar ordenação (ao clicar no cabeçalho)
-  const handleSort = (field: 'nomeEmpresa' | 'dataInicio' | 'valorFinal') => {
-    if (sortField === field) {
-      // alterna entre asc e desc
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
     }
   };
 
@@ -369,20 +211,18 @@ const ServicesManagement = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Voltar
-              </Button>
-              <h1 className="text-2xl font-bold text-teal-primary">Serviços Realizados</h1>
-            </div>
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Registrar Serviço
+        <div className="container mx-auto px-4 py-4 flex justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+<Button variant="ghost" onClick={() => navigate('/dashboard')}>
+  <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
+</Button>
             </Button>
+            <h1 className="text-2xl font-bold text-teal-primary">Serviços Realizados</h1>
           </div>
+          <Button onClick={() => { resetForm(); setEditingService(null); setShowForm(true); }}>
+            <Plus className="w-4 h-4 mr-2" /> Registrar Serviço
+          </Button>
         </div>
       </header>
 
@@ -395,177 +235,181 @@ const ServicesManagement = () => {
             <CardContent>
               <form onSubmit={handleSubmit} className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="nomeEmpresa">Nome da Empresa *</Label>
+                  <Label htmlFor="nomeEmpresa">Empresa</Label>
                   <Input
                     id="nomeEmpresa"
                     value={formData.nomeEmpresa}
-                    onChange={(e) => setFormData({ ...formData, nomeEmpresa: e.target.value })}
+                    onChange={e => setFormData({ ...formData, nomeEmpresa: e.target.value })}
                     required
                   />
                 </div>
+
                 <div>
-                  <Label htmlFor="dataInicio">Data de Início *</Label>
+                  <Label htmlFor="dataInicio">Data Início</Label>
                   <Input
                     id="dataInicio"
                     type="date"
                     value={formData.dataInicio}
-                    onChange={(e) => setFormData({ ...formData, dataInicio: e.target.value })}
+                    onChange={e => setFormData({ ...formData, dataInicio: e.target.value })}
                     required
                   />
                 </div>
+
                 <div>
-                  <Label htmlFor="dataFim">Data de Fim</Label>
+                  <Label htmlFor="dataFim">Data Fim</Label>
                   <Input
                     id="dataFim"
                     type="date"
                     value={formData.dataFim}
-                    onChange={(e) => setFormData({ ...formData, dataFim: e.target.value })}
+                    onChange={e => setFormData({ ...formData, dataFim: e.target.value })}
                   />
                 </div>
-                  <div>
-                  <Label htmlFor="hrServico">Hora do Serviço</Label>
+
+                <div>
+                  <Label htmlFor="hrServico">Hora Serviço</Label>
                   <Input
                     id="hrServico"
                     type="time"
                     value={formData.hrServico}
-                    onChange={(e) => setFormData({ ...formData, hrServico: e.target.value })}
+                    onChange={e => setFormData({ ...formData, hrServico: e.target.value })}
                   />
                 </div>
+
                 <div>
-                  <Label htmlFor="tipoCarro">Tipo de Carro *</Label>
+                  <Label htmlFor="tipoCarro">Veículo</Label>
                   <Select
                     value={formData.tipoCarro}
-                    onValueChange={(value) => setFormData({ ...formData, tipoCarro: value })}
+                    onValueChange={v => setFormData({ ...formData, tipoCarro: v })}
+                    id="tipoCarro"
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o veículo" />
+                      <SelectValue placeholder="Selecione um veículo" />
                     </SelectTrigger>
                     <SelectContent>
-                      {vehicles?.map((vehicle: any) => (
-                        <SelectItem key={vehicle.id} value={`${vehicle.tipo} - ${vehicle.placa}`}>
-                          {vehicle.tipo} - {vehicle.placa}
+                      {vehicles.map(vehicle => (
+                        <SelectItem key={vehicle.id} value={vehicle.nome || ''}>
+                          {vehicle.nome}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                    <div>
-                  <Label htmlFor="tipoCarro">Motorista *</Label>
+
+                <div>
+                  <Label htmlFor="motorista">Motorista</Label>
                   <Select
                     value={formData.motorista}
-                    onValueChange={(value) => setFormData({ ...formData, motorista: value })}
+                    onValueChange={v => setFormData({ ...formData, motorista: v })}
+                    id="motorista"
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Motorista" />
+                      <SelectValue placeholder="Selecione um motorista" />
                     </SelectTrigger>
-                   <SelectContent>
-                        {drivers.map((driver) => (
-                    <SelectItem key={driver.id} value={driver.nome}>
-                      {driver.nome}
-                    </SelectItem>
-                  ))}
+                    <SelectContent>
+                      {drivers.map(driver => (
+                        <SelectItem key={driver.id} value={driver.nome}>
+                          {driver.nome}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-
-
-
                 <div>
-                  <Label htmlFor="numeroPassageiros">Número de Passageiros *</Label>
+                  <Label htmlFor="numeroPassageiros">Número Passageiros</Label>
                   <Input
                     id="numeroPassageiros"
                     type="number"
-                    min="1"
+                    min={1}
                     value={formData.numeroPassageiros}
-                    onChange={(e) => setFormData({ ...formData, numeroPassageiros: e.target.value })}
+                    onChange={e => setFormData({ ...formData, numeroPassageiros: Number(e.target.value) })}
                     required
                   />
                 </div>
+
                 <div>
-                  <Label htmlFor="valorFinal">Valor Final (R$) *</Label>
+                  <Label htmlFor="localSaida">Local Saída</Label>
+                  <Input
+                    id="localSaida"
+                    value={formData.localSaida}
+                    onChange={e => setFormData({ ...formData, localSaida: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="localDestino">Local Destino</Label>
+                  <Input
+                    id="localDestino"
+                    value={formData.localDestino}
+                    onChange={e => setFormData({ ...formData, localDestino: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="valorFinal">Valor Final</Label>
                   <Input
                     id="valorFinal"
                     type="number"
+                    min={0}
                     step="0.01"
-                    min="0"
                     value={formData.valorFinal}
-                    onChange={(e) => setFormData({ ...formData, valorFinal: e.target.value })}
+                    onChange={e => setFormData({ ...formData, valorFinal: Number(e.target.value) })}
                     required
                   />
                 </div>
+
                 <div>
-                  <Label htmlFor="status">Status do Serviço</Label>
+                  <Label htmlFor="formadePagamento">Forma de Pagamento</Label>
+                  <Input
+                    id="formadePagamento"
+                    value={formData.formadePagamento}
+                    onChange={e => setFormData({ ...formData, formadePagamento: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="status">Status</Label>
                   <Select
+                    id="status"
                     value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    onValueChange={v => setFormData({ ...formData, status: v })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="em_andamento">Em andamento</SelectItem>
+                      <SelectItem value="agendado">Agendado</SelectItem>
+                      <SelectItem value="em_andamento">Em Andamento</SelectItem>
                       <SelectItem value="finalizado">Finalizado</SelectItem>
-                      <SelectItem value="faturado">Faturado</SelectItem>
                       <SelectItem value="cancelado">Cancelado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-  <Label htmlFor="formadePagamento">Forma de Pagamento</Label>
-  <Select
-    value={formData.formadePagamento}
-    onValueChange={(value) =>
-      setFormData({ ...formData, formadePagamento: value })
-    }
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Selecione a forma de pagamento" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="pago">Pago</SelectItem>
-      <SelectItem value="faturado">Faturado</SelectItem>
-    </SelectContent>
-  </Select>
-</div>
-                <div>
-                  <Label htmlFor="localSaida">Local de Saída</Label>
-                  <Input
-                    id="localSaida"
-                    value={formData.localSaida}
-                    onChange={(e) => setFormData({ ...formData, localSaida: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="localDestino">Local de Destino</Label>
-                  <Input
-                    id="localDestino"
-                    value={formData.localDestino}
-                    onChange={(e) => setFormData({ ...formData, localDestino: e.target.value })}
-                  />
-                </div>
-                <div className="md:col-span-2 lg:col-span-3">
-                  <Label htmlFor="observacoes">Observações</Label>
-                  <Input
-                    id="observacoes"
-                    value={formData.observacoes}
-                    onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                    placeholder="Observações adicionais sobre o serviço..."
-                  />
-                </div>
-                <div className="md:col-span-2 lg:col-span-3 flex space-x-4">
+
+                <div className="md:col-span-2 lg:col-span-3 flex space-x-4 mt-4">
                   <Button
                     type="submit"
-                    disabled={addServiceMutation.isPending || updateServiceMutation.isPending}
+                    disabled={addMutation.isLoading || updateMutation.isLoading}
                   >
-                    {addServiceMutation.isPending || updateServiceMutation.isPending
+                    {addMutation.isLoading || updateMutation.isLoading
                       ? 'Salvando...'
                       : editingService
-                      ? 'Atualizar Serviço'
-                      : 'Registrar Serviço'}
+                        ? 'Atualizar Serviço'
+                        : 'Registrar Serviço'}
                   </Button>
-                  <Button type="button" variant="outline" onClick={handleCancel}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      resetForm();
+                      setShowForm(false);
+                      setEditingService(null);
+                    }}
+                  >
                     Cancelar
                   </Button>
                 </div>
@@ -573,142 +417,147 @@ const ServicesManagement = () => {
             </CardContent>
           </Card>
         )}
- <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Calendar className="w-5 h-5 mr-2" />
-                Lista de Serviços
-              </div>
 
-              {/* FILTRO DE NOME DA EMPRESA */}
-              <Input
-                placeholder="Filtrar por empresa..."
-                value={filterEmpresa}
-                onChange={(e) => setFilterEmpresa(e.target.value)}
-                className="w-48"
-              />
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Calendar className="w-5 h-5 mr-2" /> Lista de Serviços
             </CardTitle>
           </CardHeader>
-
           <CardContent>
             {isLoading ? (
               <p>Carregando...</p>
-            ) : filteredSortedServices && filteredSortedServices.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {/* Cabeçalhos com ordenação para alguns campos */}
-                      <TableHead
-                        className="w-[80px] cursor-pointer"
-                        onClick={() => handleSort('nomeEmpresa')}
-                      >
-                        Empresa
-                        {sortField === 'nomeEmpresa' &&
-                          (sortOrder === 'asc' ? (
-                            <ArrowUp className="inline w-3 h-3 ml-1" />
-                          ) : (
-                            <ArrowDown className="inline w-3 h-3 ml-1" />
-                          ))}
-                      </TableHead>
-                      <TableHead
-                        className="w-[120px] cursor-pointer"
-                        onClick={() => handleSort('dataInicio')}
-                      >
-                        Período
-                        {sortField === 'dataInicio' &&
-                          (sortOrder === 'asc' ? (
-                            <ArrowUp className="inline w-3 h-3 ml-1" />
-                          ) : (
-                            <ArrowDown className="inline w-3 h-3 ml-1" />
-                          ))}
-                      </TableHead>
-                      <TableHead className="w-[80px]">Hora</TableHead>
-                      <TableHead className="min-w-[140px]">Veículo</TableHead>
-                      <TableHead className="min-w-[140px]">Motorista</TableHead>
-                      <TableHead className="w-[80px]">Passageiros</TableHead>
-                      <TableHead className="w-[120px]">Saída</TableHead>
-                      <TableHead className="w-[120px]">Destino</TableHead>
-                      <TableHead
-                        className="w-[100px] cursor-pointer"
-                        onClick={() => handleSort('valorFinal')}
-                      >
-                        Valor
-                        {sortField === 'valorFinal' &&
-                          (sortOrder === 'asc' ? (
-                            <ArrowUp className="inline w-3 h-3 ml-1" />
-                          ) : (
-                            <ArrowDown className="inline w-3 h-3 ml-1" />
-                          ))}
-                      </TableHead>
-                      <TableHead className="w-[100px]">Pagamento</TableHead>
-                      <TableHead className="w-[100px]">Status</TableHead>
-                      <TableHead className="w-[50px]">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSortedServices.map((service: any) => (
-                      <TableRow key={service.id}>
-                        <TableCell className="font-medium">{service.nomeEmpresa}</TableCell>
-                        <TableCell>
-                          {formatDate(service.dataInicio)}
-                          {service.dataFim && (
-                            <span className="text-sm text-gray-500"> até {formatDate(service.dataFim)}</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{service.hrServico || '-'}</TableCell>
-                        <TableCell>{service.tipoCarro}</TableCell>
-                        <TableCell>{service.motorista}</TableCell>
-                        <TableCell>{service.numeroPassageiros}</TableCell>
-                        <TableCell>{service.localSaida}</TableCell>
-                        <TableCell>{service.localDestino}</TableCell>
-                        <TableCell>{formatCurrency(service.valorFinal || 0)}</TableCell>
-                        <TableCell>{service.formadePagamento || '-'}</TableCell>
-                        <TableCell>
-                          <Badge className={getBadgeClass(service.status)}>
-                            {formatStatus(service.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-6 w-6 p-0">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEdit(service)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
+            ) : services?.length ? (
+              <>
+                {/* FILTROS & ORDENAÇÃO */}
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div>
+                    <Label>Empresa</Label>
+                    <Input
+                      placeholder="Filtrar por empresa"
+                      value={filtroEmpresa}
+                      onChange={e => setFiltroEmpresa(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Data Inicial</Label>
+                    <Input
+                      type="date"
+                      value={filtroDataInicio}
+                      onChange={e => setFiltroDataInicio(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Data Final</Label>
+                    <Input
+                      type="date"
+                      value={filtroDataFim}
+                      onChange={e => setFiltroDataFim(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Ordenar por</Label>
+                    <Select value={ordenarPor} onValueChange={v => setOrdenarPor(v as any)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Ordenar por" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dataInicio">Data</SelectItem>
+                        <SelectItem value="valorFinal">Valor</SelectItem>
+                        <SelectItem value="nomeEmpresa">Empresa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      className="mt-2"
+                      onClick={() => setOrdemAscendente(!ordemAscendente)}
+                    >
+                      {ordemAscendente ? 'Ascendente' : 'Descendente'}
+                    </Button>
+                  </div>
+                </div>
 
-                              <DropdownMenuItem onClick={() => handleResumo(service)}>
-                                <FileText className="mr-2 h-4 w-4" />
-                                Ordem de Serviço
-                              </DropdownMenuItem>
-
-                              <DropdownMenuItem
-                                onClick={() => deleteServiceMutation.mutate(service.id)}
-                                disabled={deleteServiceMutation.isPending}
-                                className="text-red-600 focus:text-red-600"
-                              >
-                                <Trash className="mr-2 h-4 w-4" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+                {/* TABELA DE SERVIÇOS */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead>Período</TableHead>
+                        <TableHead>Hora</TableHead>
+                        <TableHead>Veículo</TableHead>
+                        <TableHead>Motorista</TableHead>
+                        <TableHead>Passageiros</TableHead>
+                        <TableHead>Saída</TableHead>
+                        <TableHead>Destino</TableHead>
+                        <TableHead>Valor</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Ações</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {services
+                        .filter(svc =>
+                          (filtroEmpresa
+                            ? svc.nomeEmpresa?.toLowerCase().includes(filtroEmpresa.toLowerCase())
+                            : true) &&
+                          (filtroDataInicio ? svc.dataInicio >= filtroDataInicio : true) &&
+                          (filtroDataFim ? svc.dataFim <= filtroDataFim : true)
+                        )
+                        .sort((a, b) => {
+                          const aVal = a[ordenarPor] || '';
+                          const bVal = b[ordenarPor] || '';
+                          if (aVal < bVal) return ordemAscendente ? -1 : 1;
+                          if (aVal > bVal) return ordemAscendente ? 1 : -1;
+                          return 0;
+                        })
+                        .map(svc => (
+                          <TableRow key={svc.id}>
+                            <TableCell>{svc.nomeEmpresa}</TableCell>
+                            <TableCell>
+                              {formatDate(svc.dataInicio || '')}
+                              {svc.dataFim && svc.dataFim !== svc.dataInicio ? ` a ${formatDate(svc.dataFim)}` : ''}
+                            </TableCell>
+                            <TableCell>{svc.hrServico}</TableCell>
+                            <TableCell>{svc.tipoCarro}</TableCell>
+                            <TableCell>{svc.motorista}</TableCell>
+                            <TableCell>{svc.numeroPassageiros}</TableCell>
+                            <TableCell>{svc.localSaida}</TableCell>
+                            <TableCell>{svc.localDestino}</TableCell>
+                            <TableCell>{formatCurrency(svc.valorFinal || 0)}</TableCell>
+                            <TableCell>
+                              <Badge className={getBadgeClass(svc.status || '')}>
+                                {formatStatus(svc.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" aria-label="Ações">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  <DropdownMenuItem onClick={() => handleEdit(svc)}>
+                                    <Edit className="mr-2 h-4 w-4" /> Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => deleteMutation.mutate(svc.id)}>
+                                    <Trash className="mr-2 h-4 w-4" /> Excluir
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleResumo(svc)}>
+                                    <FileText className="mr-2 h-4 w-4" /> Resumo
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             ) : (
-              <div className="text-center py-8">
-                <Car className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">Nenhum serviço registrado ainda.</p>
-              </div>
+              <p>Nenhum serviço registrado.</p>
             )}
           </CardContent>
         </Card>

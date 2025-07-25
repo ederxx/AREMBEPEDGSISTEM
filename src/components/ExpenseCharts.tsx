@@ -42,7 +42,6 @@ const CATEGORY_NAMES = {
   veiculo: 'Veículos',
   funcionarios: 'Funcionários',
   pessoal: 'Pessoal',
-  diversos: 'Diversos', // ✅ Adicionado
 };
 
 const STATUS_OPTIONS = [
@@ -107,54 +106,56 @@ const ExpenseCharts = ({ expenses }: { expenses: Expense[] }) => {
   }, [expenses, selectedCategoriaSet, selectedStatus, startDate, endDate, selectedEmpresa, selectedFuncionario, selectedFormaPagamento]);
 
   // Dados para gráficos (usando filteredExpenses)
- const categoryData = useMemo(() => {
-  const totals: Record<string, { name: string; value: number; count: number }> = {};
-
-  filteredExpenses.forEach((e) => {
-    const key = e.categoria;
-    const name = CATEGORY_NAMES[key as keyof typeof CATEGORY_NAMES] || capitalizeFirstLetter(key);
-
-    if (!totals[key]) {
-      totals[key] = { name, value: 0, count: 0 };
-    }
-
-    totals[key].value += e.valor;
-    totals[key].count += 1;
-  });
-
-  return Object.values(totals).filter(item => item.value > 0);
-}, [filteredExpenses]);
-function capitalizeFirstLetter(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
-const subcategoryData = filteredExpenses.reduce((acc, expense) => {
-  const rawKey = expense.subcategoria.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove acentos
-  const displayName = expense.subcategoria.trim(); // mantém o nome original
-
-  if (!acc[rawKey]) {
-    acc[rawKey] = {
-      name: displayName,
-      value: 0,
-      count: 0,
+  const categoryData = Object.entries(CATEGORY_NAMES).map(([key, name]) => {
+    const categoryExpenses = filteredExpenses.filter(e => e.categoria === key);
+    const total = categoryExpenses.reduce((sum, e) => sum + e.valor, 0);
+    return {
+      name,
+      value: total,
+      count: categoryExpenses.length,
     };
-  } else {
-    // Atualiza nome se o novo for mais completo ou diferente (opcional)
-    if (acc[rawKey].name !== displayName) {
-      acc[rawKey].name += ` / ${displayName}`;
+  }).filter(item => item.value > 0);
+  const enrichedExpenses = useMemo(() => {
+  return filteredExpenses.map(e => ({
+    ...e,
+    computedStatus: calculateStatus(e),
+  }));
+}, [filteredExpenses]);
+const statusData = [
+  {
+    name: 'Pagas',
+    value: enrichedExpenses.filter(e => e.computedStatus === 'pago').reduce((sum, e) => sum + e.valor, 0),
+    count: enrichedExpenses.filter(e => e.computedStatus === 'pago').length,
+  },
+  {
+    name: 'Pendentes',
+    value: enrichedExpenses.filter(e => e.computedStatus === 'pendente').reduce((sum, e) => sum + e.valor, 0),
+    count: enrichedExpenses.filter(e => e.computedStatus === 'pendente').length,
+  },
+  {
+    name: 'Vencidas',
+    value: enrichedExpenses.filter(e => e.computedStatus === 'vencido').reduce((sum, e) => sum + e.valor, 0),
+    count: enrichedExpenses.filter(e => e.computedStatus === 'vencido').length,
+  },
+].filter(item => item.value > 0);
+  const subcategoryData = filteredExpenses.reduce((acc, expense) => {
+    const key = `${expense.categoria}-${expense.subcategoria}`;
+    if (!acc[key]) {
+      acc[key] = {
+        name: expense.subcategoria,
+        categoria: CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES],
+        value: 0,
+        count: 0,
+      };
     }
-  }
+    acc[key].value += expense.valor;
+    acc[key].count += 1;
+    return acc;
+  }, {} as Record<string, any>);
 
-  acc[rawKey].value += expense.valor;
-  acc[rawKey].count += 1;
-
-  return acc;
-}, {} as Record<string, any>);
-
-
-const subcategoryArray = Object.values(subcategoryData)
-  .sort((a: any, b: any) => b.value - a.value)
-  .slice(0, 10);
-
+  const subcategoryArray = Object.values(subcategoryData)
+    .sort((a: any, b: any) => b.value - a.value)
+    .slice(0, 10);
 
   const getMonthlyData = () => {
     const monthlyData: Record<string, number> = {};
@@ -416,3 +417,4 @@ const calculateStatus = (expense: Expense): 'pago' | 'pendente' | 'vencido' => {
 };
 
 export default ExpenseCharts;
+

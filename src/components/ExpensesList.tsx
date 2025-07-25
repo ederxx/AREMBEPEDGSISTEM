@@ -61,14 +61,6 @@ interface UserInfo {
   displayName?: string; // opcional, pode ser usado se o usuário tiver um nome
 }
 
-const [openMarkAsPaidPopover, setOpenMarkAsPaidPopover] = useState<string | null>(null);
-
-useEffect(() => {
-  if (!openMarkAsPaidPopover) {
-    setPaymentDate(undefined);
-  }
-}, [openMarkAsPaidPopover]);
-
 const STATUS_OPTIONS = [
   { value: '', label: 'Todos' },
   { value: 'pago', label: 'Pago' },
@@ -502,7 +494,7 @@ const { user } = useAuth();
                               ? expense.funcionario
                                              : '-'}
                           </TableCell>
-                   <TableCell className="relative">
+                    <TableCell>
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button variant="ghost" className="h-8 w-8 p-0">
@@ -511,7 +503,7 @@ const { user } = useAuth();
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
       {status !== 'pago' && (
-        <DropdownMenuItem onClick={() => setOpenMarkAsPaidPopover(expense.id)}>
+        <DropdownMenuItem onClick={() => setEditingExpense(expense.id)}>
           Marcar como pago
         </DropdownMenuItem>
       )}
@@ -530,35 +522,6 @@ const { user } = useAuth();
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
-
-  {/* POPOVER PARA PAGAMENTO */}
-  {openMarkAsPaidPopover === expense.id && (
-    <Popover open onOpenChange={() => setOpenMarkAsPaidPopover(null)}>
-      <PopoverContent className="z-50 w-[260px] space-y-4">
-        <div>
-          <p className="text-sm font-medium mb-2">Data de pagamento</p>
-          <Calendar
-            mode="single"
-            selected={paymentDate}
-            onSelect={(date) => setPaymentDate(date || undefined)}
-          />
-        </div>
-        <Button
-          className="w-full"
-          onClick={() => {
-            if (!paymentDate) {
-              toast({ title: 'Selecione a data de pagamento', variant: 'destructive' });
-              return;
-            }
-            handleMarkAsPaid(expense.id);
-            setOpenMarkAsPaidPopover(null);
-          }}
-        >
-          Confirmar pagamento
-        </Button>
-      </PopoverContent>
-    </Popover>
-  )}
 </TableCell>
                     </TableRow>
                   );
