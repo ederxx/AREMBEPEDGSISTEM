@@ -128,19 +128,22 @@ function capitalizeFirstLetter(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
   const subcategoryData = filteredExpenses.reduce((acc, expense) => {
-    const key = `${expense.categoria}-${expense.subcategoria}`;
-    if (!acc[key]) {
-      acc[key] = {
-        name: expense.subcategoria,
-        categoria: CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES],
-        value: 0,
-        count: 0,
-      };
-    }
-    acc[key].value += expense.valor;
-    acc[key].count += 1;
-    return acc;
-  }, {} as Record<string, any>);
+   const subcategoryData = filteredExpenses.reduce((acc, expense) => {
+  const key = expense.subcategoria.trim().toLowerCase(); // Agrupa só pelo nome, ignorando maiúsculas/minúsculas
+
+  if (!acc[key]) {
+    acc[key] = {
+      name: expense.subcategoria,
+      value: 0,
+      count: 0,
+    };
+  }
+
+  acc[key].value += expense.valor;
+  acc[key].count += 1;
+
+  return acc;
+}, {} as Record<string, any>);
 
   const subcategoryArray = Object.values(subcategoryData)
     .sort((a: any, b: any) => b.value - a.value)
