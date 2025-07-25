@@ -127,8 +127,8 @@ const ExpenseCharts = ({ expenses }: { expenses: Expense[] }) => {
 function capitalizeFirstLetter(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
- const subcategoryData = filteredExpenses.reduce((acc, expense) => {
-  const key = expense.subcategoria.trim().toLowerCase(); // Agrupa só pelo nome
+const subcategoryData = filteredExpenses.reduce((acc, expense) => {
+  const key = expense.subcategoria.trim().toLowerCase();
 
   if (!acc[key]) {
     acc[key] = {
@@ -144,9 +144,10 @@ function capitalizeFirstLetter(str: string) {
   return acc;
 }, {} as Record<string, any>);
 
-  const subcategoryArray = Object.values(subcategoryData)
-    .sort((a: any, b: any) => b.value - a.value)
-    .slice(0, 10);
+const subcategoryArray = Object.values(subcategoryData)
+  .sort((a: any, b: any) => b.value - a.value)
+  .slice(0, 10);
+
 
   const getMonthlyData = () => {
     const monthlyData: Record<string, number> = {};
