@@ -128,32 +128,34 @@ function capitalizeFirstLetter(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 const subcategoryData = filteredExpenses.reduce((acc, expense) => {
-  const rawKey = expense.subcategoria.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove acentos
-  const displayName = expense.subcategoria.trim(); // mantém o nome original
+  // Normaliza para comparar (sem acento, minúsculo, sem espaços extras)
+  const normalizedKey = expense.subcategoria
+    .normalize("NFD")                    // separa acentos
+    .replace(/[\u0300-\u036f]/g, "")    // remove acentos
+    .trim()
+    .toLowerCase();
 
-  if (!acc[rawKey]) {
-    acc[rawKey] = {
-      name: displayName,
+  // Guarda o nome original (para exibição) — apenas o primeiro encontrado
+  if (!acc[normalizedKey]) {
+    acc[normalizedKey] = {
+      name: expense.subcategoria.trim(), // exibe o nome original
       value: 0,
       count: 0,
     };
-  } else {
-    // Atualiza nome se o novo for mais completo ou diferente (opcional)
-    if (acc[rawKey].name !== displayName) {
-      acc[rawKey].name += ` / ${displayName}`;
-    }
   }
 
-  acc[rawKey].value += expense.valor;
-  acc[rawKey].count += 1;
+  acc[normalizedKey].value += expense.valor;
+  acc[normalizedKey].count += 1;
 
   return acc;
-}, {} as Record<string, any>);
+}, {} as Record<string, { name: string; value: number; count: number }>);
+
 
 
 const subcategoryArray = Object.values(subcategoryData)
-  .sort((a: any, b: any) => b.value - a.value)
+  .sort((a, b) => b.value - a.value)
   .slice(0, 10);
+
 
 
   const getMonthlyData = () => {
