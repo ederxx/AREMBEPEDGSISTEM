@@ -127,9 +127,8 @@ const ExpenseCharts = ({ expenses }: { expenses: Expense[] }) => {
 function capitalizeFirstLetter(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
-  const subcategoryData = filteredExpenses.reduce((acc, expense) => {
-   const subcategoryData = filteredExpenses.reduce((acc, expense) => {
-  const key = expense.subcategoria.trim().toLowerCase(); // Agrupa só pelo nome, ignorando maiúsculas/minúsculas
+ const subcategoryData = filteredExpenses.reduce((acc, expense) => {
+  const key = expense.subcategoria.trim().toLowerCase(); // Agrupa só pelo nome
 
   if (!acc[key]) {
     acc[key] = {
