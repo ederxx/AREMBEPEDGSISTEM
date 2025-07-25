@@ -42,7 +42,7 @@ const CATEGORY_NAMES = {
   veiculo: 'Veículos',
   funcionarios: 'Funcionários',
   pessoal: 'Pessoal',
-  diversos: 'Diversos', // ✅ Adicionado
+  diversos: 'Diversos',
 };
 
 const STATUS_OPTIONS = [
@@ -106,64 +106,77 @@ const ExpenseCharts = ({ expenses }: { expenses: Expense[] }) => {
     });
   }, [expenses, selectedCategoriaSet, selectedStatus, startDate, endDate, selectedEmpresa, selectedFuncionario, selectedFormaPagamento]);
 
-  // Dados para gráficos (usando filteredExpenses)
- const categoryData = useMemo(() => {
-  const totals: Record<string, { name: string; value: number; count: number }> = {};
+  // Dados para gráfico de categorias
+  const categoryData = useMemo(() => {
+    const totals: Record<string, { name: string; value: number; count: number }> = {};
 
-  filteredExpenses.forEach((e) => {
-    const key = e.categoria;
-    const name = CATEGORY_NAMES[key as keyof typeof CATEGORY_NAMES] || capitalizeFirstLetter(key);
+    filteredExpenses.forEach((e) => {
+      const key = e.categoria;
+      const name = CATEGORY_NAMES[key as keyof typeof CATEGORY_NAMES] || capitalizeFirstLetter(key);
 
-    if (!totals[key]) {
-      totals[key] = { name, value: 0, count: 0 };
-    }
+      if (!totals[key]) {
+        totals[key] = { name, value: 0, count: 0 };
+      }
 
-    totals[key].value += e.valor;
-    totals[key].count += 1;
-  });
+      totals[key].value += e.valor;
+      totals[key].count += 1;
+    });
 
-  return Object.values(totals).filter(item => item.value > 0);
-}, [filteredExpenses]);
-function capitalizeFirstLetter(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
-const subcategoryData = filteredExpenses.reduce((acc, expense) => {
-  // Normaliza para comparar (sem acento, minúsculo, sem espaços extras)
-  const normalizedKey = expense.subcategoria
-    .normalize("NFD")                    // separa acentos
-    .replace(/[\u0300-\u036f]/g, "")    // remove acentos
-    .trim()
-    .toLowerCase();
+    return Object.values(totals).filter(item => item.value > 0);
+  }, [filteredExpenses]);
 
-  // Guarda o nome original (para exibição) — apenas o primeiro encontrado
-  if (!acc[normalizedKey]) {
-    acc[normalizedKey] = {
-      name: expense.subcategoria.trim(), // exibe o nome original
-      value: 0,
-      count: 0,
-    };
+  function capitalizeFirstLetter(str: string) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
-  acc[normalizedKey].value += expense.valor;
-  acc[normalizedKey].count += 1;
+  // Dados para gráfico de status
+  const statusData = useMemo(() => {
+    const totals: Record<string, { name: string; value: number; count: number }> = {
+      pago: { name: 'Pago', value: 0, count: 0 },
+      pendente: { name: 'Pendente', value: 0, count: 0 },
+      vencido: { name: 'Vencido', value: 0, count: 0 },
+    };
 
-  return acc;
-}, {} as Record<string, { name: string; value: number; count: number }>);
-  const subcategoryArray = Object.values(subcategoryData)
-  .sort((a, b) => b.value - a.value)
-  .slice(0, 10);
+    filteredExpenses.forEach(expense => {
+      const status = expense.status;
+      totals[status].value += expense.valor;
+      totals[status].count += 1;
+    });
 
-  const name = Object.entries(nameCounts).sort((a, b) => b[1] - a[1])[0][0]; // mais comum
+    return Object.values(totals).filter(item => item.value > 0);
+  }, [filteredExpenses]);
 
-  return {
-    name,
-    value: entry.value,
-    count: entry.count,
-  };
-}).sort((a, b) => b.value - a.value).slice(0, 10);
+  // Dados para gráfico de subcategorias
+  const subcategoryData = useMemo(() => {
+    const acc = filteredExpenses.reduce((acc, expense) => {
+      // Normaliza para comparar (sem acento, minúsculo, sem espaços extras)
+      const normalizedKey = expense.subcategoria
+        .normalize("NFD")                    // separa acentos
+        .replace(/[\u0300-\u036f]/g, "")    // remove acentos
+        .trim()
+        .toLowerCase();
 
+      // Guarda o nome original (para exibição) — apenas o primeiro encontrado
+      if (!acc[normalizedKey]) {
+        acc[normalizedKey] = {
+          name: expense.subcategoria.trim(), // exibe o nome original
+          value: 0,
+          count: 0,
+        };
+      }
 
+      acc[normalizedKey].value += expense.valor;
+      acc[normalizedKey].count += 1;
 
+      return acc;
+    }, {} as Record<string, { name: string; value: number; count: number }>);
+
+    return Object.values(acc)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [filteredExpenses]);
+
+  // Dados para gráfico de evolução mensal (últimos 6 meses)
   const getMonthlyData = () => {
     const monthlyData: Record<string, number> = {};
     const now = new Date();
@@ -189,8 +202,9 @@ const subcategoryData = filteredExpenses.reduce((acc, expense) => {
     }));
   };
 
-  const monthlyData = getMonthlyData();
+  const monthlyData = useMemo(() => getMonthlyData(), [filteredExpenses]);
 
+  // Tooltip customizado
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -379,7 +393,7 @@ const subcategoryData = filteredExpenses.reduce((acc, expense) => {
         <CardHeader><CardTitle>Top 10 Subcategorias</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={subcategoryArray} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <BarChart data={subcategoryData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
               <YAxis tickFormatter={value => `R$ ${value.toLocaleString('pt-BR')}`} />
@@ -424,4 +438,3 @@ const calculateStatus = (expense: Expense): 'pago' | 'pendente' | 'vencido' => {
 };
 
 export default ExpenseCharts;
-
