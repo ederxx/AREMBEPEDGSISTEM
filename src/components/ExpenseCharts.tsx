@@ -42,6 +42,7 @@ const CATEGORY_NAMES = {
   veiculo: 'Veículos',
   funcionarios: 'Funcionários',
   pessoal: 'Pessoal',
+  diversos: 'Diversos', // ✅ Adicionado
 };
 
 const STATUS_OPTIONS = [
@@ -106,38 +107,26 @@ const ExpenseCharts = ({ expenses }: { expenses: Expense[] }) => {
   }, [expenses, selectedCategoriaSet, selectedStatus, startDate, endDate, selectedEmpresa, selectedFuncionario, selectedFormaPagamento]);
 
   // Dados para gráficos (usando filteredExpenses)
-  const categoryData = Object.entries(CATEGORY_NAMES).map(([key, name]) => {
-    const categoryExpenses = filteredExpenses.filter(e => e.categoria === key);
-    const total = categoryExpenses.reduce((sum, e) => sum + e.valor, 0);
-    return {
-      name,
-      value: total,
-      count: categoryExpenses.length,
-    };
-  }).filter(item => item.value > 0);
-  const enrichedExpenses = useMemo(() => {
-  return filteredExpenses.map(e => ({
-    ...e,
-    computedStatus: calculateStatus(e),
-  }));
+ const categoryData = useMemo(() => {
+  const totals: Record<string, { name: string; value: number; count: number }> = {};
+
+  filteredExpenses.forEach((e) => {
+    const key = e.categoria;
+    const name = CATEGORY_NAMES[key as keyof typeof CATEGORY_NAMES] || capitalizeFirstLetter(key);
+
+    if (!totals[key]) {
+      totals[key] = { name, value: 0, count: 0 };
+    }
+
+    totals[key].value += e.valor;
+    totals[key].count += 1;
+  });
+
+  return Object.values(totals).filter(item => item.value > 0);
 }, [filteredExpenses]);
-const statusData = [
-  {
-    name: 'Pagas',
-    value: enrichedExpenses.filter(e => e.computedStatus === 'pago').reduce((sum, e) => sum + e.valor, 0),
-    count: enrichedExpenses.filter(e => e.computedStatus === 'pago').length,
-  },
-  {
-    name: 'Pendentes',
-    value: enrichedExpenses.filter(e => e.computedStatus === 'pendente').reduce((sum, e) => sum + e.valor, 0),
-    count: enrichedExpenses.filter(e => e.computedStatus === 'pendente').length,
-  },
-  {
-    name: 'Vencidas',
-    value: enrichedExpenses.filter(e => e.computedStatus === 'vencido').reduce((sum, e) => sum + e.valor, 0),
-    count: enrichedExpenses.filter(e => e.computedStatus === 'vencido').length,
-  },
-].filter(item => item.value > 0);
+function capitalizeFirstLetter(str: string) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
   const subcategoryData = filteredExpenses.reduce((acc, expense) => {
     const key = `${expense.categoria}-${expense.subcategoria}`;
     if (!acc[key]) {
