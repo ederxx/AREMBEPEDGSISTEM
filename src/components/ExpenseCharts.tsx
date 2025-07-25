@@ -127,34 +127,45 @@ const ExpenseCharts = ({ expenses }: { expenses: Expense[] }) => {
 function capitalizeFirstLetter(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
-const subcategoryData = filteredExpenses.reduce((acc, expense) => {
-  // Normaliza para comparar (sem acento, minúsculo, sem espaços extras)
-  const normalizedKey = expense.subcategoria
-    .normalize("NFD")                    // separa acentos
-    .replace(/[\u0300-\u036f]/g, "")    // remove acentos
+const subcategoryMap = new Map<string, { originalNames: string[], value: number, count: number }>();
+
+filteredExpenses.forEach(expense => {
+  const rawName = expense.subcategoria || '';
+  const normalizedKey = rawName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
 
-  // Guarda o nome original (para exibição) — apenas o primeiro encontrado
-  if (!acc[normalizedKey]) {
-    acc[normalizedKey] = {
-      name: expense.subcategoria.trim(), // exibe o nome original
+  if (!subcategoryMap.has(normalizedKey)) {
+    subcategoryMap.set(normalizedKey, {
+      originalNames: [],
       value: 0,
-      count: 0,
-    };
+      count: 0
+    });
   }
 
-  acc[normalizedKey].value += expense.valor;
-  acc[normalizedKey].count += 1;
+  const entry = subcategoryMap.get(normalizedKey)!;
+  entry.originalNames.push(rawName.trim());
+  entry.value += expense.valor;
+  entry.count += 1;
+});
 
-  return acc;
-}, {} as Record<string, { name: string; value: number; count: number }>);
+// Decide qual nome exibir com base no mais frequente
+const subcategoryArray = Array.from(subcategoryMap.values()).map(entry => {
+  const nameCounts = entry.originalNames.reduce((acc, name) => {
+    acc[name] = (acc[name] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
+  const name = Object.entries(nameCounts).sort((a, b) => b[1] - a[1])[0][0]; // mais comum
 
-
-const subcategoryArray = Object.values(subcategoryData)
-  .sort((a, b) => b.value - a.value)
-  .slice(0, 10);
+  return {
+    name,
+    value: entry.value,
+    count: entry.count,
+  };
+}).sort((a, b) => b.value - a.value).slice(0, 10);
 
 
 
