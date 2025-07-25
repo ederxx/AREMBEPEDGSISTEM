@@ -128,21 +128,28 @@ function capitalizeFirstLetter(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 const subcategoryData = filteredExpenses.reduce((acc, expense) => {
-  const key = expense.subcategoria.trim().toLowerCase();
+  const rawKey = expense.subcategoria.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove acentos
+  const displayName = expense.subcategoria.trim(); // mantém o nome original
 
-  if (!acc[key]) {
-    acc[key] = {
-      name: expense.subcategoria,
+  if (!acc[rawKey]) {
+    acc[rawKey] = {
+      name: displayName,
       value: 0,
       count: 0,
     };
+  } else {
+    // Atualiza nome se o novo for mais completo ou diferente (opcional)
+    if (acc[rawKey].name !== displayName) {
+      acc[rawKey].name += ` / ${displayName}`;
+    }
   }
 
-  acc[key].value += expense.valor;
-  acc[key].count += 1;
+  acc[rawKey].value += expense.valor;
+  acc[rawKey].count += 1;
 
   return acc;
 }, {} as Record<string, any>);
+
 
 const subcategoryArray = Object.values(subcategoryData)
   .sort((a: any, b: any) => b.value - a.value)
