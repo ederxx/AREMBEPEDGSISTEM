@@ -51,16 +51,21 @@ const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
 
   return (
     <div className="grid md:grid-cols-4 gap-6 mb-8">
-      <Card>
+        <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">Total Gasto</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Pagas</CardTitle>
+          <TrendingUp className="h-4 w-4 text-green-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(classified.total)}</div>
+          <div className="text-xl font-bold text-green-600">
+            {classified.pagas.count} despesa(s)
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {formatCurrency(classified.pagas.total)}
+          </div>
         </CardContent>
       </Card>
-
+      
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
@@ -75,7 +80,7 @@ const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
           </div>
         </CardContent>
       </Card>
-
+      
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">Vencidas</CardTitle>
@@ -93,18 +98,16 @@ const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">Pagas</CardTitle>
-          <TrendingUp className="h-4 w-4 text-green-500" />
+          <CardTitle className="text-sm font-medium">Total Gasto</CardTitle>
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-xl font-bold text-green-600">
-            {classified.pagas.count} despesa(s)
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {formatCurrency(classified.pagas.total)}
-          </div>
+          <div className="text-2xl font-bold">{formatCurrency(classified.total)}</div>
         </CardContent>
       </Card>
+
+
+    
     </div>
   );
 };
