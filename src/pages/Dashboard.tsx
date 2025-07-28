@@ -253,17 +253,65 @@ const totalValorFinalizado = (services || [])
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           
           {/* Orçamentos Pendentes */}
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/quotes')}>
+
+          
+          <Card className="cursor-default hover:shadow-lg transition-shadow">
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">Receita Serviço</CardTitle>
+    <DollarSign className="h-4 w-4 text-emerald-600" />
+  </CardHeader>
+  <CardContent>
+    <div className="space-y-1">
+      <div className="text-sm text-blue-600">Finalizados:</div>
+      <div className="text-xl font-bold text-blue-600">
+        R$ {totalValorFinalizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+      </div>
+      <div className="text-sm text-green-600 mt-2">Faturados:</div>
+      <div className="text-xl font-bold text-green-600">
+        R$ {totalValorFaturado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+      </div>
+    </div>
+  </CardContent>
+</Card>
+         
+          {/* Despesas Pendentes */}
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Orçamentos Pendentes</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Despesas </CardTitle>
+              <FileText className="h-4 w-4 text-yellow-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{pendingQuotes.length}</div>
+              <div className="text-2xl font-bold text-yellow-600">{pendingExpenses.length}</div>
+            </CardContent>
+          </Card>
+
+          {/* Total Despesas */}
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Despesas Pendentes</CardTitle>
+              <DollarSign className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                R$ {totalExpensesValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </CardContent>
+          </Card>
+
+
+           {/* Despesas Vencidas */}
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Despesas Vencidas</CardTitle>
+              <AlertCircle className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{overdueExpenses.length}</div>
             </CardContent>
           </Card>
 
           {/* Serviços Hoje */}
+
           <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/services')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Serviços Hoje</CardTitle>
@@ -296,60 +344,21 @@ const totalValorFinalizado = (services || [])
             </CardContent>
           </Card>
 
-          <Card className="cursor-default hover:shadow-lg transition-shadow">
-  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-    <CardTitle className="text-sm font-medium">Receita Serviço</CardTitle>
-    <DollarSign className="h-4 w-4 text-emerald-600" />
-  </CardHeader>
-  <CardContent>
-    <div className="space-y-1">
-      <div className="text-sm text-blue-600">Finalizados:</div>
-      <div className="text-xl font-bold text-blue-600">
-        R$ {totalValorFinalizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-      </div>
-      <div className="text-sm text-green-600 mt-2">Faturados:</div>
-      <div className="text-xl font-bold text-green-600">
-        R$ {totalValorFaturado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-      </div>
-    </div>
-  </CardContent>
-</Card>
-
-
-          {/* Total Despesas */}
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
+           <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/quotes')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Despesas</CardTitle>
-              <DollarSign className="h-4 w-4 text-blue-600" />
+              <CardTitle className="text-sm font-medium">Orçamentos Pendentes</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                R$ {totalExpensesValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </div>
+              <div className="text-2xl font-bold">{pendingQuotes.length}</div>
             </CardContent>
           </Card>
 
-          {/* Despesas Pendentes */}
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Despesas Pendentes</CardTitle>
-              <FileText className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{pendingExpenses.length}</div>
-            </CardContent>
-          </Card>
 
-          {/* Despesas Vencidas */}
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Despesas Vencidas</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{overdueExpenses.length}</div>
-            </CardContent>
-          </Card>
+
+          
+
+         
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">
@@ -546,7 +555,7 @@ const totalValorFinalizado = (services || [])
               )}
             </CardContent>
           </Card>
-         <BackupDownloader /> 
+        <BackupDownloader /> 
         </div>
       </main>
     </div>
