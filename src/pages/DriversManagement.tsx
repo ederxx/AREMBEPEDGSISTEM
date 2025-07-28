@@ -78,14 +78,14 @@ const DriversManagement = () => {
     return await getDownloadURL(photoRef);
   };
 
-  const addDriverMutation = useMutation({
-    mutationFn: async (data: Omit<Driver, 'id'>) => {
-      let photoURL = data.photoURL;
-      if (photoFile) {
-        setUploadingPhoto(true);
-        photoURL = await uploadPhoto(photoFile);
-        setUploadingPhoto(false);
-      }
+const addDriverMutation = useMutation({
+  mutationFn: async (data: Omit<Driver, 'id'>) => {
+    let photoURL = data.photoURL;
+    if (photoFile) {
+      setUploadingPhoto(true);
+      photoURL = await uploadPhoto(photoFile);
+      setUploadingPhoto(false);
+    }
 await addDoc(collection(db, 'drivers'), {
   nomeCompleto: data.nomeCompleto || '',
   telefone: data.telefone || '',
@@ -96,7 +96,9 @@ await addDoc(collection(db, 'drivers'), {
   cnhValidade: data.cnhValidade || '',
   cursoValidade: data.cursoValidade || '',
   createdAt: new Date().toISOString(),
-});
+      // >>> ADICIONE ESTA LINHA <<<
+      ownerId: user?.uid, // Assumindo que 'user' do useAuth está disponível e tem 'uid'
+    });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
