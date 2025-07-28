@@ -86,11 +86,17 @@ const DriversManagement = () => {
         photoURL = await uploadPhoto(photoFile);
         setUploadingPhoto(false);
       }
-      await addDoc(collection(db, 'drivers'), {
-        ...data,
-        photoURL,
-        createdAt: new Date().toISOString(),
-      });
+await addDoc(collection(db, 'drivers'), {
+  nomeCompleto: data.nomeCompleto || '',
+  telefone: data.telefone || '',
+  empresa: data.empresa || '',
+  photoURL: photoURL || '',
+  dadosBancarios: data.dadosBancarios || '',
+  cnHNumber: data.cnHNumber || '',
+  cnhValidade: data.cnhValidade || '',
+  cursoValidade: data.cursoValidade || '',
+  createdAt: new Date().toISOString(),
+});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
