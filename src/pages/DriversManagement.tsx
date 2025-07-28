@@ -81,10 +81,10 @@ const DriversManagement = () => {
 const addDriverMutation = useMutation({
   mutationFn: async (data: Omit<Driver, 'id'>) => {
     let photoURL = data.photoURL;
-    if (photoFile) {
-      setUploadingPhoto(true);
-      photoURL = await uploadPhoto(photoFile);
-      setUploadingPhoto(false);
+     console.log("UID sendo enviado:", user?.uid); // <-- Adicione isso
+    if (!user?.uid) {
+        console.error("Erro: UID do usuário não disponível para cadastro.");
+        throw new Error("Usuário não autenticado ou UID ausente."); // Opcional, para forçar um erro claro
     }
 await addDoc(collection(db, 'drivers'), {
   nomeCompleto: data.nomeCompleto || '',
