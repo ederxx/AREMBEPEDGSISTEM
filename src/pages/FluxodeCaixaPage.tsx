@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
-import FluxoDeCaixa from './fluxoCaixa';
+import FluxoDeCaixa from './FluxoCaixa';
 
 // ... outras importações
 
