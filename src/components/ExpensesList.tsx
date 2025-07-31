@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -10,6 +11,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -26,6 +28,8 @@ import {
   DollarSign,
   FileText,
   AlertCircle,
+  MoreHorizontal,
+  FileUp,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -41,14 +45,15 @@ import { Expense } from '@/types/expense';
 import { CATEGORY_NAMES } from '@/constants/expenseCategories';
 import { EditExpenseModal } from '@/components/EditExpenseModal';
 import { useAuth } from '@/hooks/useAuth';
-import { parse } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+import { ptBR } from 'date-fns/locale';
 
 interface ExpensesListProps {
   expenses: Expense[];
@@ -58,7 +63,7 @@ interface ExpensesListProps {
 interface UserInfo {
   id: string;
   email: string;
-  displayName?: string; // opcional, pode ser usado se o usuário tiver um nome
+  displayName?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -68,7 +73,6 @@ const STATUS_OPTIONS = [
   { value: 'vencido', label: 'Vencido' },
 ];
 
-// Meses para filtro por mês
 const MONTH_OPTIONS = [
   { value: '', label: 'Todos os meses' },
   { value: '1', label: 'Janeiro' },
@@ -87,76 +91,91 @@ const MONTH_OPTIONS = [
 
 const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
   const queryClient = useQueryClient();
-  const [editingExpense, setEditingExpense] = useState<string | null>(null);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [paymentDate, setPaymentDate] = useState<Date | undefined>(undefined);
   const [usersMap, setUsersMap] = useState<Record<string, UserInfo>>({});
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
-const { user } = useAuth();
-  // Filtros
+  const { user } = useAuth();
+  
+  const tableRef = useRef(null);
+
+  const handleExportExcel = () => {
+    const dataToExport = filteredExpenses.map(expense => ({
+      Despesa: expense.nome,
+      Categoria: CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES] || '-',
+      Funcionário: expense.categoria === 'funcionarios' ? expense.funcionario || '-' : '-',
+      Vencimento: expense.dataVencimento ? new Date(expense.dataVencimento).toLocaleDateString('pt-BR') : '-',
+      Pagamento: expense.dataPagamento ? new Date(expense.dataPagamento).toLocaleDateString('pt-BR') : '-',
+      Valor: expense.valor,
+      Empresa: expense.empresa || '-',
+      'Forma de Pagamento': expense.formaPagamento || '-',
+      Status: calculateStatus(expense),
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Despesas");
+    
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], {type: "application/octet-stream"});
+    saveAs(blob, "despesas.xlsx");
+  };
+
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterCategorySet, setFilterCategorySet] = useState<Set<string>>(new Set());
   const [filterCompany, setFilterCompany] = useState<string>('');
-  const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>(''); // Substitui banco por formaPagamento
-  const [filterStartDate, setFilterStartDate] = useState<string>(''); // yyyy-MM-dd
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('');
+  const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
   const [filterMonth, setFilterMonth] = useState<string>('');
 
-  // Pega todos os métodos de pagamento disponíveis na lista para o filtro dinâmico
   const uniquePaymentMethods = Array.from(
     new Set(expenses.map((e) => e.formaPagamento).filter(Boolean))
   );
 
-  // Função para calcular status da despesa
   const calculateStatus = (
     expense: Expense
   ): 'pago' | 'pendente' | 'vencido' => {
     const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
     const vencimento = new Date(expense.dataVencimento);
+    vencimento.setHours(0, 0, 0, 0);
     const pagamento = expense.dataPagamento ? new Date(expense.dataPagamento) : null;
-
-    if (pagamento && pagamento <= hoje) return 'pago';
-    if (vencimento > hoje && (!pagamento || pagamento > hoje)) return 'pendente';
-    if (vencimento < hoje && (!pagamento || pagamento > hoje)) return 'vencido';
+    if (pagamento) return 'pago';
+    if (vencimento < hoje) return 'vencido';
     return 'pendente';
   };
 
-  // Busca emails dos usuários
   useEffect(() => {
     const userIds = Array.from(new Set(expenses.map((e) => e.userId).filter(Boolean)));
-
     if (userIds.length === 0) {
       setUsersMap({});
       return;
     }
-
     async function fetchUsers() {
       try {
         const allUsers: Record<string, UserInfo> = {};
-
         for (const uid of userIds) {
           const userDoc = await getDoc(doc(db, 'users', uid));
-       if (userDoc.exists()) {
-  const data = userDoc.data();
-  allUsers[uid] = {
-    id: uid,
-    email: data.email || 'Sem email',
-    displayName: data.displayName || data.email || 'Desconhecido',
-  };
-}
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            allUsers[uid] = {
+              id: uid,
+              email: data.email || 'Sem email',
+              displayName: data.displayName || data.email || 'Desconhecido',
+            };
+          }
         }
-
         setUsersMap(allUsers);
       } catch (error) {
         console.error('Erro ao buscar usuários:', error);
         setUsersMap({});
       }
     }
-
     fetchUsers();
   }, [expenses]);
 
-  // Mutations para atualizar, excluir e editar despesa
   const markAsPaidMutation = useMutation({
     mutationFn: async ({ id, dataPagamento }: { id: string; dataPagamento: string }) => {
       const expenseRef = doc(db, 'expenses', id);
@@ -165,7 +184,7 @@ const { user } = useAuth();
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       toast({ title: 'Despesa marcada como paga!' });
-      setEditingExpense(null);
+      setEditingExpenseId(null);
       setPaymentDate(undefined);
     },
     onError: () => {
@@ -213,7 +232,6 @@ const { user } = useAuth();
     }
   };
 
-  // Badge e ícone para status
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pago':
@@ -240,13 +258,11 @@ const { user } = useAuth();
     }
   };
 
-  // Filtra categorias
   const checkCategoryFilter = (categoria: string) => {
     if (filterCategorySet.size === 0) return true;
     return filterCategorySet.has(categoria);
   };
 
-  // Aplica os filtros
   const filteredExpenses = expenses
     .filter((e) => {
       if (filterStatus && calculateStatus(e) !== filterStatus) return false;
@@ -259,10 +275,12 @@ const { user } = useAuth();
       }
       if (filterStartDate) {
         const start = new Date(filterStartDate);
+        start.setHours(0, 0, 0, 0);
         if (new Date(e.dataVencimento) < start) return false;
       }
       if (filterEndDate) {
         const end = new Date(filterEndDate);
+        end.setHours(23, 59, 59, 999);
         if (new Date(e.dataVencimento) > end) return false;
       }
       return true;
@@ -290,265 +308,338 @@ const { user } = useAuth();
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="p-6 text-center">Carregando despesas...</CardContent>
-      </Card>
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="p-6 text-center">Carregando despesas...</CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto px-4 py-8 space-y-6">
       {/* FILTROS */}
-     <Card>
-  <CardContent className="space-y-6">
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {/* Status */}
-      <div className="flex flex-col">
-        <label htmlFor="statusFilter" className="text-sm font-medium text-muted-foreground mb-1">Status</label>
-        <select
-          id="statusFilter"
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtros de Despesas</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {/* Status */}
+            <div className="flex flex-col">
+              <label htmlFor="statusFilter" className="text-sm font-medium text-muted-foreground mb-1">Status</label>
+              <select
+                id="statusFilter"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      {/* Empresa */}
-      <div className="flex flex-col">
-        <label htmlFor="companyFilter" className="text-sm font-medium text-muted-foreground mb-1">Empresa</label>
-        <select
-          id="companyFilter"
-          value={filterCompany}
-          onChange={(e) => setFilterCompany(e.target.value)}
-          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-        >
-          <option value="">Todas</option>
-          <option value="Arembepe Turismo">Arembepe Turismo</option>
-          <option value="DG Transportes">DG Transportes</option>
-          <option value="Terceirizado">Terceirizado</option>
-        </select>
-      </div>
+            {/* Empresa */}
+            <div className="flex flex-col">
+              <label htmlFor="companyFilter" className="text-sm font-medium text-muted-foreground mb-1">Empresa</label>
+              <select
+                id="companyFilter"
+                value={filterCompany}
+                onChange={(e) => setFilterCompany(e.target.value)}
+                className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              >
+                <option value="">Todas</option>
+                <option value="Arembepe Turismo">Arembepe Turismo</option>
+                <option value="DG Transportes">DG Transportes</option>
+                <option value="Terceirizado">Terceirizado</option>
+              </select>
+            </div>
 
-      {/* Forma de Pagamento */}
-      <div className="flex flex-col">
-        <label htmlFor="paymentMethodFilter" className="text-sm font-medium text-muted-foreground mb-1">Forma de Pagamento</label>
-        <select
-          id="paymentMethodFilter"
-          value={filterPaymentMethod}
-          onChange={(e) => setFilterPaymentMethod(e.target.value)}
-          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-        >
-          <option value="">Todas</option>
-          {uniquePaymentMethods.map((method) => (
-            <option key={method} value={method}>
-              {method}
-            </option>
-          ))}
-        </select>
-      </div>
+            {/* Forma de Pagamento */}
+            <div className="flex flex-col">
+              <label htmlFor="paymentMethodFilter" className="text-sm font-medium text-muted-foreground mb-1">Forma de Pagamento</label>
+              <select
+                id="paymentMethodFilter"
+                value={filterPaymentMethod}
+                onChange={(e) => setFilterPaymentMethod(e.target.value)}
+                className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              >
+                <option value="">Todas</option>
+                {uniquePaymentMethods.map((method) => (
+                  <option key={method} value={method}>
+                    {method}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      {/* Mês */}
-      <div className="flex flex-col">
-        <label htmlFor="monthFilter" className="text-sm font-medium text-muted-foreground mb-1">Mês</label>
-        <select
-          id="monthFilter"
-          value={filterMonth}
-          onChange={(e) => setFilterMonth(e.target.value)}
-          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-        >
-          {MONTH_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
+            {/* Mês */}
+            <div className="flex flex-col">
+              <label htmlFor="monthFilter" className="text-sm font-medium text-muted-foreground mb-1">Mês</label>
+              <select
+                id="monthFilter"
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              >
+                {MONTH_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      {/* Data Inicial */}
-      <div className="flex flex-col">
-        <label htmlFor="startDateFilter" className="text-sm font-medium text-muted-foreground mb-1">Data Inicial</label>
-        <input
-          id="startDateFilter"
-          type="date"
-          value={filterStartDate}
-          onChange={(e) => setFilterStartDate(e.target.value)}
-          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-        />
-      </div>
+            {/* Data Inicial */}
+            <div className="flex flex-col">
+              <label htmlFor="startDateFilter" className="text-sm font-medium text-muted-foreground mb-1">Data Inicial</label>
+              <input
+                id="startDateFilter"
+                type="date"
+                value={filterStartDate}
+                onChange={(e) => setFilterStartDate(e.target.value)}
+                className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              />
+            </div>
 
-      {/* Data Final */}
-      <div className="flex flex-col">
-        <label htmlFor="endDateFilter" className="text-sm font-medium text-muted-foreground mb-1">Data Final</label>
-        <input
-          id="endDateFilter"
-          type="date"
-          value={filterEndDate}
-          onChange={(e) => setFilterEndDate(e.target.value)}
-          className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-        />
-      </div>
-    </div>
+            {/* Data Final */}
+            <div className="flex flex-col">
+              <label htmlFor="endDateFilter" className="text-sm font-medium text-muted-foreground mb-1">Data Final</label>
+              <input
+                id="endDateFilter"
+                type="date"
+                value={filterEndDate}
+                onChange={(e) => setFilterEndDate(e.target.value)}
+                className="rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              />
+            </div>
+          </div>
 
-    {/* Categorias */}
-    <div>
-      <label className="text-sm font-medium text-muted-foreground mb-2 block">Categorias</label>
-      <div className="flex flex-wrap gap-3 max-w-4xl">
-        {Object.entries(CATEGORY_NAMES).map(([key, label]) => (
-          <label
-            key={key}
-            className="inline-flex items-center gap-2 text-sm text-gray-700"
-          >
-            <input
-              type="checkbox"
-              checked={filterCategorySet.has(key)}
-              onChange={() => toggleCategory(key)}
-              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            {label}
-          </label>
-        ))}
-      </div>
-    </div>
+          {/* Categorias */}
+          <div>
+            <label className="text-sm font-medium text-muted-foreground mb-2 block">Categorias</label>
+            <div className="flex flex-wrap gap-3 max-w-4xl">
+              {Object.entries(CATEGORY_NAMES).map(([key, label]) => (
+                <label
+                  key={key}
+                  className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={filterCategorySet.has(key)}
+                    onChange={() => toggleCategory(key)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
 
-    {/* Botão limpar filtros */}
-    <div className="pt-2">
-      <Button variant="outline" onClick={clearFilters}>
-        Limpar Filtros
-      </Button>
-    </div>
-  </CardContent>
-
-  <CardContent className="flex justify-between items-center px-6 py-4">
-    <div className="text-lg font-medium">
-      Total filtrado: {filteredExpenses.length} {filteredExpenses.length === 1 ? 'despesa' : 'despesas'}
-    </div>
-    <div className="text-lg font-semibold text-green-700">
-     Total: R$ {filteredExpenses.reduce((acc, e) => acc + e.valor, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-    </div>
-  </CardContent>
-</Card>
-      
+          <div className="flex items-center justify-between">
+            {/* Botão limpar filtros */}
+            <Button variant="outline" onClick={clearFilters}>
+              Limpar Filtros
+            </Button>
+            <div className="flex items-center space-x-4">
+              <span className="text-lg font-medium">
+                Total de despesas filtradas: {filteredExpenses.length}
+              </span>
+              <span className="text-lg font-semibold text-green-700">
+                Valor total: R$ {filteredExpenses.reduce((acc, e) => acc + e.valor, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* TABELA */}
       <Card>
-        <CardHeader>
-          <CardTitle>
-            Lista de Despesas ({filteredExpenses.length} {filteredExpenses.length === 1 ? 'item' : 'itens'})
-          </CardTitle>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle>Lista de Despesas</CardTitle>
+          <Button onClick={handleExportExcel} className="bg-green-600 hover:bg-green-700 text-white">
+            <FileUp className="w-4 h-4 mr-2" />
+            Exportar para Excel
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-<Table className="text-sm min-w-full">
-            <TableHeader>
-  <TableRow>
-    <TableHead>Status</TableHead>
-    <TableHead>Despesa</TableHead>
-    <TableHead>Categoria</TableHead>
-    {/* REMOVIDO: <TableHead>Subcategoria</TableHead> */}
-    <TableHead>Vencimento</TableHead>
-    <TableHead>Pagamento</TableHead>
-    <TableHead>Valor</TableHead>
-    <TableHead>Empresa</TableHead>
-    <TableHead>Forma de Pagamento</TableHead>
-    <TableHead>Funcionário</TableHead>
-    {/* REMOVIDO: <TableHead>Usuário</TableHead> */}
-    <TableHead>Ações</TableHead>
-  </TableRow>
-</TableHeader>
+            <Table className="text-sm min-w-full" ref={tableRef}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Despesa</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead>Funcionário</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead>Pagamento</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>Forma de Pagamento</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Ações</TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
-                {filteredExpenses.map((expense) => {
-                  const status = calculateStatus(expense);
-                  return (
-                    <TableRow
-                      key={expense.id}
-                      className={status === 'vencido' ? 'bg-red-50' : undefined}
-                    >
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          {getStatusIcon(status)}
-                          {getStatusBadge(status)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{expense.nome}</TableCell>
-                      <TableCell>{CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES]}</TableCell>
-                      
-                    <TableCell>
-  {parse(expense.dataVencimento, 'yyyy-MM-dd', new Date()).toLocaleDateString('pt-BR')}
-</TableCell>
-<TableCell>
-  {expense.dataPagamento 
-    ? parse(expense.dataPagamento, 'yyyy-MM-dd', new Date()).toLocaleDateString('pt-BR') 
-    : '-'}
-</TableCell>
-                      <TableCell className="font-medium">R$ {expense.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
-                      <TableCell>{expense.empresa || '-'}</TableCell>
-                      <TableCell>{expense.formaPagamento || '-'}</TableCell>
-                     <TableCell>
-                            {expense.categoria === 'funcionarios' && expense.funcionario
-                              ? expense.funcionario
-                                             : '-'}
-                          </TableCell>
-                    <TableCell>
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="ghost" className="h-8 w-8 p-0">
-        <MoreHorizontal className="h-4 w-4" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-      {status !== 'pago' && (
-        <DropdownMenuItem onClick={() => setEditingExpense(expense.id)}>
-          Marcar como pago
-        </DropdownMenuItem>
-      )}
-      <DropdownMenuItem
-        onClick={() => {
-          setExpenseToEdit(expense);
-          setIsEditModalOpen(true);
-        }}
-      >
-        Editar
-      </DropdownMenuItem>
-      <DropdownMenuItem
-        onClick={() => deleteExpenseMutation.mutate(expense.id)}
-      >
-        Excluir
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
-</TableCell>
-                    </TableRow>
-                  );
-                })}
+                {filteredExpenses.length > 0 ? (
+                  filteredExpenses.map((expense) => {
+                    const status = calculateStatus(expense);
+                    const isBeingEdited = editingExpenseId === expense.id;
+                    return (
+                      <TableRow
+                        key={expense.id}
+                        className={status === 'vencido' ? 'bg-red-50 hover:bg-red-100' : undefined}
+                      >
+                        <TableCell className="font-medium">{expense.nome}</TableCell>
+                        <TableCell>
+                          {CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES] || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {expense.categoria === 'funcionarios' && expense.funcionario
+                            ? expense.funcionario
+                            : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {expense.dataVencimento
+                            ? new Date(expense.dataVencimento).toLocaleDateString('pt-BR')
+                            : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {isBeingEdited ? (
+                            <div className="flex flex-col space-y-2">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant={"outline"}
+                                    className="w-full justify-start text-left font-normal"
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {paymentDate ? format(paymentDate, "PPP", { locale: ptBR }) : <span>Selecione a data</span>}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                  <Calendar
+                                    mode="single"
+                                    selected={paymentDate}
+                                    onSelect={setPaymentDate}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleMarkAsPaid(expense.id)}
+                                >
+                                  Salvar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setEditingExpenseId(null)}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            expense.dataPagamento
+                              ? new Date(expense.dataPagamento).toLocaleDateString('pt-BR')
+                              : '-'
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium text-right">
+                          R$ {expense.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell>{expense.empresa || '-'}</TableCell>
+                        <TableCell>{expense.formaPagamento || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {getStatusIcon(status)}
+                            {getStatusBadge(status)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {status !== 'pago' && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setEditingExpenseId(expense.id);
+                                    setPaymentDate(new Date());
+                                  }}
+                                >
+                                  Marcar como pago
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setExpenseToEdit(expense);
+                                  setIsEditModalOpen(true);
+                                }}
+                              >
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => deleteExpenseMutation.mutate(expense.id)}
+                              >
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center h-24">
+                      Nenhuma despesa encontrada para os filtros selecionados.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
+              {filteredExpenses.length > 0 && (
+                <TableFooter>
+                  <TableRow className="font-bold">
+                    <TableCell colSpan={5}>Total de Despesas</TableCell>
+                    <TableCell className="text-right">
+                      R$ {filteredExpenses
+                        .reduce((sum, expense) => sum + (expense.valor || 0), 0)
+                        .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell colSpan={4}></TableCell>
+                  </TableRow>
+                </TableFooter>
+              )}
             </Table>
           </div>
         </CardContent>
       </Card>
 
-<EditExpenseModal
-  isOpen={isEditModalOpen}
-  onClose={() => setIsEditModalOpen(false)}
-  onSave={(updated) => {
-    if (!user?.uid) {
-      toast({ title: 'Usuário não autenticado', variant: 'destructive' });
-      return;
-    }
-
-    editExpenseMutation.mutate({ 
-      ...updated, 
-      id: expenseToEdit!.id,
-      userId: user.uid
-    });
-  }}
-  expense={expenseToEdit}
-/>
+      <EditExpenseModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={(updated) => {
+          if (!user?.uid || !expenseToEdit) {
+            toast({ title: 'Erro: Usuário ou despesa não encontrados.', variant: 'destructive' });
+            return;
+          }
+          editExpenseMutation.mutate({
+            ...updated,
+            id: expenseToEdit.id,
+            userId: user.uid,
+          });
+        }}
+        expense={expenseToEdit}
+      />
     </div>
   );
 };

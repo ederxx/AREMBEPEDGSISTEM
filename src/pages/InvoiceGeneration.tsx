@@ -44,7 +44,7 @@ const InvoiceGeneration = () => {
       const snapshot = await getDocs(collection(db, 'services'));
       return snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() as any }))
-        .filter(service => service.status === 'faturado');
+        .filter(service => service.formadePagamento === 'faturado');
     },
     enabled: !!user
   });

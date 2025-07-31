@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,13 +20,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Edit, Trash } from "lucide-react";
+// Importar o componente Dialog
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const ServicesManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
+
+  // --- ALTERAR O ESTADO AQUI ---
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<any>(null);
   const [formData, setFormData] = useState({
     nomeEmpresa: '',
@@ -45,12 +55,14 @@ const ServicesManagement = () => {
   });
   const [drivers, setDrivers] = useState<any[]>([]);
 
-  // --- NOVOS ESTADOS PARA FILTRO E ORDENAÇÃO ---
-  const [filterEmpresa, setFilterEmpresa] = useState('');
+  // --- ESTADOS PARA FILTRO E ORDENAÇÃO ---
+const [filterEmpresa, setFilterEmpresa] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' |  'em_andamento' | 'finalizado' | 'cancelado' >('all');
+  const [filterPayment, setFilterPayment] = useState<'all' | 'pago' | 'faturado' | 'nao_pago'>('all');
+  
   const [sortField, setSortField] = useState<'nomeEmpresa' | 'dataInicio' | 'valorFinal' | ''>('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Funções para formatar status e definir cor do Badge
   const formatStatus = (status?: string) => {
     if (!status) return 'Sem status';
     return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
@@ -60,13 +72,12 @@ const ServicesManagement = () => {
     switch (status) {
       case 'finalizado':
         return 'bg-green-500 hover:bg-green-600';
-      case 'agendado':
-        return 'bg-blue-500 hover:bg-blue-600';
+    
       case 'em_andamento':
         return 'bg-yellow-500 hover:bg-yellow-600 text-black';
       case 'cancelado':
         return 'bg-red-500 hover:bg-red-600';
-      case 'pendente':
+     
       default:
         return 'bg-gray-500 hover:bg-gray-600';
     }
@@ -97,6 +108,17 @@ const ServicesManagement = () => {
 
     fetchDrivers();
   }, []);
+
+  const getPaymentBadgeClass = (payment: string) => {
+    switch (payment) {
+      case 'pago':
+        return 'bg-green-600 text-white';
+      case 'faturado':
+        return 'bg-blue-600 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
 
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
@@ -133,7 +155,7 @@ const ServicesManagement = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
-      setShowForm(false);
+      setIsModalOpen(false); // Fecha o modal
       resetForm();
       toast({
         title: "Sucesso",
@@ -162,7 +184,7 @@ const ServicesManagement = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setEditingService(null);
-      setShowForm(false);
+      setIsModalOpen(false); // Fecha o modal
       resetForm();
       toast({
         title: "Sucesso",
@@ -242,10 +264,11 @@ const ServicesManagement = () => {
       addServiceMutation.mutate(formData);
     }
   };
+
   const handleResumo = (service: any) => {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return;
-  const html = `
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const html = `
     <html>
       <head>
         <title>Resumo do Serviço</title>
@@ -277,9 +300,9 @@ const ServicesManagement = () => {
     </html>
   `;
 
-  printWindow.document.write(html);
-  printWindow.document.close();
-};
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
 
   const handleEdit = (service: any) => {
     setEditingService(service);
@@ -292,17 +315,17 @@ const ServicesManagement = () => {
       numeroPassageiros: service.numeroPassageiros?.toString() || '',
       localSaida: service.localSaida || '',
       localDestino: service.localDestino || '',
-          hrServico: service.hrServico || '',
+      hrServico: service.hrServico || '',
       valorFinal: service.valorFinal?.toString() || '',
       status: service.status || 'pendente',
       formadePagamento: service.formadePagamento || '',
       observacoes: service.observacoes || ''
     });
-    setShowForm(true);
+    setIsModalOpen(true); // Abre o modal para edição
   };
 
   const handleCancel = () => {
-    setShowForm(false);
+    setIsModalOpen(false); // Fecha o modal
     setEditingService(null);
     resetForm();
   };
@@ -321,42 +344,46 @@ const ServicesManagement = () => {
   };
 
   if (!user) return null;
-
-
-
-
-
-
-
- 
-
-  const filteredSortedServices = services
-    ? services
-        .filter(service =>
-          service.nomeEmpresa.toLowerCase().includes(filterEmpresa.toLowerCase())
-        )
-        .sort((a, b) => {
-          if (!sortField) return 0; // sem ordenação
-
-          let aValue = a[sortField];
-          let bValue = b[sortField];
-
-          // Caso campo seja data, converte para Date para comparação
-          if (sortField === 'dataInicio') {
-            aValue = new Date(aValue);
-            bValue = new Date(bValue);
+ const filteredServices = services
+    ? services.filter(service => {
+        // Filtro por nome da empresa
+        if (filterEmpresa && !service.nomeEmpresa.toLowerCase().includes(filterEmpresa.toLowerCase())) {
+          return false;
+        }
+        // Filtro por status
+        if (filterStatus !== 'all' && service.status !== filterStatus) {
+          return false;
+        }
+        // Filtro por forma de pagamento
+        if (filterPayment === 'nao_pago') {
+          if (service.formadePagamento === 'pago' || service.formadePagamento === 'faturado') {
+            return false;
           }
+        } else if (filterPayment !== 'all' && service.formadePagamento !== filterPayment) {
+          return false;
+        }
 
-          if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-          if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-          return 0;
-        })
+        return true;
+      })
     : [];
 
-  // Função para alternar ordenação (ao clicar no cabeçalho)
+  const filteredSortedServices = filteredServices.sort((a, b) => {
+    if (!sortField) return 0;
+    let aValue = a[sortField];
+    let bValue = b[sortField];
+
+    if (sortField === 'dataInicio') {
+      aValue = new Date(aValue);
+      bValue = new Date(bValue);
+    }
+
+    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   const handleSort = (field: 'nomeEmpresa' | 'dataInicio' | 'valorFinal') => {
     if (sortField === field) {
-      // alterna entre asc e desc
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
@@ -364,7 +391,6 @@ const ServicesManagement = () => {
     }
   };
 
-  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -378,7 +404,12 @@ const ServicesManagement = () => {
               </Button>
               <h1 className="text-2xl font-bold text-teal-primary">Serviços Realizados</h1>
             </div>
-            <Button onClick={() => setShowForm(true)}>
+            {/* O BOTÃO QUE ABRE O MODAL */}
+            <Button onClick={() => {
+              setEditingService(null); // Garante que é um novo registro
+              resetForm(); // Limpa o formulário
+              setIsModalOpen(true); // Abre o modal
+            }}>
               <Plus className="w-4 h-4 mr-2" />
               Registrar Serviço
             </Button>
@@ -387,208 +418,232 @@ const ServicesManagement = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {showForm && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>{editingService ? 'Editar Serviço' : 'Registrar Novo Serviço'}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="nomeEmpresa">Nome da Empresa *</Label>
-                  <Input
-                    id="nomeEmpresa"
-                    value={formData.nomeEmpresa}
-                    onChange={(e) => setFormData({ ...formData, nomeEmpresa: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="dataInicio">Data de Início *</Label>
-                  <Input
-                    id="dataInicio"
-                    type="date"
-                    value={formData.dataInicio}
-                    onChange={(e) => setFormData({ ...formData, dataInicio: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="dataFim">Data de Fim</Label>
-                  <Input
-                    id="dataFim"
-                    type="date"
-                    value={formData.dataFim}
-                    onChange={(e) => setFormData({ ...formData, dataFim: e.target.value })}
-                  />
-                </div>
-                  <div>
-                  <Label htmlFor="hrServico">Hora do Serviço</Label>
-                  <Input
-                    id="hrServico"
-                    type="time"
-                    value={formData.hrServico}
-                    onChange={(e) => setFormData({ ...formData, hrServico: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="tipoCarro">Tipo de Carro *</Label>
-                  <Select
-                    value={formData.tipoCarro}
-                    onValueChange={(value) => setFormData({ ...formData, tipoCarro: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o veículo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vehicles?.map((vehicle: any) => (
-                        <SelectItem key={vehicle.id} value={`${vehicle.tipo} - ${vehicle.placa}`}>
-                          {vehicle.tipo} - {vehicle.placa}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                    <div>
-                  <Label htmlFor="tipoCarro">Motorista *</Label>
-                  <Select
-                    value={formData.motorista}
-                    onValueChange={(value) => setFormData({ ...formData, motorista: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Motorista" />
-                    </SelectTrigger>
-                   <SelectContent>
-                        {drivers.map((driver) => (
-                    <SelectItem key={driver.id} value={driver.nome}>
-                      {driver.nome}
-                    </SelectItem>
-                  ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-
-
-
-                <div>
-                  <Label htmlFor="numeroPassageiros">Número de Passageiros *</Label>
-                  <Input
-                    id="numeroPassageiros"
-                    type="number"
-                    min="1"
-                    value={formData.numeroPassageiros}
-                    onChange={(e) => setFormData({ ...formData, numeroPassageiros: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="valorFinal">Valor Final (R$) *</Label>
-                  <Input
-                    id="valorFinal"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.valorFinal}
-                    onChange={(e) => setFormData({ ...formData, valorFinal: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="status">Status do Serviço</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="em_andamento">Em andamento</SelectItem>
-                      <SelectItem value="finalizado">Finalizado</SelectItem>
-                      <SelectItem value="faturado">Faturado</SelectItem>
-                      <SelectItem value="cancelado">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-  <Label htmlFor="formadePagamento">Forma de Pagamento</Label>
-  <Select
-    value={formData.formadePagamento}
-    onValueChange={(value) =>
-      setFormData({ ...formData, formadePagamento: value })
-    }
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Selecione a forma de pagamento" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="pago">Pago</SelectItem>
-      <SelectItem value="faturado">Faturado</SelectItem>
-    </SelectContent>
-  </Select>
-</div>
-                <div>
-                  <Label htmlFor="localSaida">Local de Saída</Label>
-                  <Input
-                    id="localSaida"
-                    value={formData.localSaida}
-                    onChange={(e) => setFormData({ ...formData, localSaida: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="localDestino">Local de Destino</Label>
-                  <Input
-                    id="localDestino"
-                    value={formData.localDestino}
-                    onChange={(e) => setFormData({ ...formData, localDestino: e.target.value })}
-                  />
-                </div>
-                <div className="md:col-span-2 lg:col-span-3">
-                  <Label htmlFor="observacoes">Observações</Label>
-                  <Input
-                    id="observacoes"
-                    value={formData.observacoes}
-                    onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                    placeholder="Observações adicionais sobre o serviço..."
-                  />
-                </div>
-                <div className="md:col-span-2 lg:col-span-3 flex space-x-4">
-                  <Button
-                    type="submit"
-                    disabled={addServiceMutation.isPending || updateServiceMutation.isPending}
-                  >
-                    {addServiceMutation.isPending || updateServiceMutation.isPending
-                      ? 'Salvando...'
-                      : editingService
+        {/* O MODAL AGORA É UM COMPONENTE SEPARADO */}
+<Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+            <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingService ? 'Editar Serviço' : 'Registrar Novo Serviço'}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
+              {/* O conteúdo do seu formulário vai aqui */}
+              <div>
+                <Label htmlFor="nomeEmpresa">Nome da Empresa *</Label>
+                <Input
+                  id="nomeEmpresa"
+                  value={formData.nomeEmpresa}
+                  onChange={(e) => setFormData({ ...formData, nomeEmpresa: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="dataInicio">Data de Início *</Label>
+                <Input
+                  id="dataInicio"
+                  type="date"
+                  value={formData.dataInicio}
+                  onChange={(e) => setFormData({ ...formData, dataInicio: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="dataFim">Data de Fim</Label>
+                <Input
+                  id="dataFim"
+                  type="date"
+                  value={formData.dataFim}
+                  onChange={(e) => setFormData({ ...formData, dataFim: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="hrServico">Hora do Serviço</Label>
+                <Input
+                  id="hrServico"
+                  type="time"
+                  value={formData.hrServico}
+                  onChange={(e) => setFormData({ ...formData, hrServico: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="tipoCarro">Tipo de Carro *</Label>
+                <Select
+                  value={formData.tipoCarro}
+                  onValueChange={(value) => setFormData({ ...formData, tipoCarro: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o veículo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehicles?.map((vehicle: any) => (
+                      <SelectItem key={vehicle.id} value={`${vehicle.tipo} - ${vehicle.placa}`}>
+                        {vehicle.tipo} - {vehicle.placa}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="motorista">Motorista *</Label>
+                <Select
+                  value={formData.motorista}
+                  onValueChange={(value) => setFormData({ ...formData, motorista: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Motorista" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {drivers.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.nome}>
+                        {driver.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="numeroPassageiros">Número de Passageiros *</Label>
+                <Input
+                  id="numeroPassageiros"
+                  type="number"
+                  min="1"
+                  value={formData.numeroPassageiros}
+                  onChange={(e) => setFormData({ ...formData, numeroPassageiros: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="valorFinal">Valor Final (R$) *</Label>
+                <Input
+                  id="valorFinal"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.valorFinal}
+                  onChange={(e) => setFormData({ ...formData, valorFinal: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="status">Status do Serviço</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData({ ...formData, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="em_andamento">Em andamento</SelectItem>
+                    <SelectItem value="finalizado">Finalizado</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="formadePagamento">Forma de Pagamento</Label>
+                <Select
+                  value={formData.formadePagamento}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, formadePagamento: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a forma de pagamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pago">Pago</SelectItem>
+                    <SelectItem value="faturado">Faturado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="localSaida">Local de Saída</Label>
+                <Input
+                  id="localSaida"
+                  value={formData.localSaida}
+                  onChange={(e) => setFormData({ ...formData, localSaida: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="localDestino">Local de Destino</Label>
+                <Input
+                  id="localDestino"
+                  value={formData.localDestino}
+                  onChange={(e) => setFormData({ ...formData, localDestino: e.target.value })}
+                />
+              </div>
+              <div className="md:col-span-2 lg:col-span-3">
+                <Label htmlFor="observacoes">Observações</Label>
+                <Input
+                  id="observacoes"
+                  value={formData.observacoes}
+                  onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                  placeholder="Observações adicionais sobre o serviço..."
+                />
+              </div>
+              <div className="md:col-span-2 lg:col-span-3 flex justify-end space-x-4">
+                <Button type="button" variant="outline" onClick={handleCancel}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={addServiceMutation.isPending || updateServiceMutation.isPending}
+                >
+                  {addServiceMutation.isPending || updateServiceMutation.isPending
+                    ? 'Salvando...'
+                    : editingService
                       ? 'Atualizar Serviço'
                       : 'Registrar Serviço'}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={handleCancel}>
-                    Cancelar
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
- <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Calendar className="w-5 h-5 mr-2" />
-                Lista de Serviços
+                </Button>
               </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+        <Card>
+          <CardHeader>
+           {/* --- NOVO: LINHA DOS FILTROS --- */}
+            <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Lista de Serviços
+              </CardTitle>
+              <div className="flex items-center gap-4 flex-wrap">
+                <Input
+                  placeholder="Filtrar por empresa..."
+                  value={filterEmpresa}
+                  onChange={(e) => setFilterEmpresa(e.target.value)}
+                  className="w-48"
+                />
 
-              {/* FILTRO DE NOME DA EMPRESA */}
-              <Input
-                placeholder="Filtrar por empresa..."
-                value={filterEmpresa}
-                onChange={(e) => setFilterEmpresa(e.target.value)}
-                className="w-48"
-              />
-            </CardTitle>
+                {/* --- NOVO: FILTRO DE STATUS --- */}
+                <Select value={filterStatus} onValueChange={(value: 'all' | 'agendado' | 'em_andamento' | 'finalizado' | 'cancelado' | 'pendente') => setFilterStatus(value)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                  
+                    <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                    <SelectItem value="finalizado">Finalizado</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
+
+                  </SelectContent>
+                </Select>
+
+                {/* --- NOVO: FILTRO DE FORMA DE PAGAMENTO --- */}
+                <Select value={filterPayment} onValueChange={(value: 'all' | 'pago' | 'faturado' | 'nao_pago') => setFilterPayment(value)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Pagamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Pagamentos</SelectItem>
+                    <SelectItem value="pago">Pago</SelectItem>
+                    <SelectItem value="faturado">Faturado</SelectItem>
+                    <SelectItem value="nao_pago">Não Pago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {/* --- FIM DA LINHA DOS FILTROS --- */}
           </CardHeader>
 
           <CardContent>
@@ -624,12 +679,12 @@ const ServicesManagement = () => {
                             <ArrowDown className="inline w-3 h-3 ml-1" />
                           ))}
                       </TableHead>
-                      <TableHead className="w-[80px]">Hora</TableHead>
-                      <TableHead className="min-w-[140px]">Veículo</TableHead>
-                      <TableHead className="min-w-[140px]">Motorista</TableHead>
-                      <TableHead className="w-[80px]">Passageiros</TableHead>
-                      <TableHead className="w-[120px]">Saída</TableHead>
-                      <TableHead className="w-[120px]">Destino</TableHead>
+                      <TableHead className="w-[80px]text-xs px-2 py-1">Hora</TableHead>
+                      <TableHead className="min-w-[140px]text-xs px-2 py-1">Veículo</TableHead>
+                      <TableHead className="min-w-[140px]text-xs px-2 py-1">Motorista</TableHead>
+                      <TableHead className="w-[80px]text-xs px-2 py-1">Passageiros</TableHead>
+                      <TableHead className="w-[80px]text-xs px-2 py-1">Saída</TableHead>
+                      <TableHead className="w-[80px]text-xs px-2 py-1">Destino</TableHead>
                       <TableHead
                         className="w-[100px] cursor-pointer"
                         onClick={() => handleSort('valorFinal')}
@@ -642,9 +697,9 @@ const ServicesManagement = () => {
                             <ArrowDown className="inline w-3 h-3 ml-1" />
                           ))}
                       </TableHead>
-                      <TableHead className="w-[100px]">Pagamento</TableHead>
-                      <TableHead className="w-[100px]">Status</TableHead>
-                      <TableHead className="w-[50px]">Ações</TableHead>
+                      <TableHead className="w-[80px] text-xs px-2 py-1">Pagamento</TableHead>
+                      <TableHead className="w-[100px] text-xs px-2 py-1 ">Status</TableHead>
+                      <TableHead className="w-[50px] text-xs px-2 py-1 ">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -654,7 +709,7 @@ const ServicesManagement = () => {
                         <TableCell>
                           {formatDate(service.dataInicio)}
                           {service.dataFim && (
-                            <span className="text-sm text-gray-500"> até {formatDate(service.dataFim)}</span>
+                            <span className="text-sm text-gray-300"> até {formatDate(service.dataFim)}</span>
                           )}
                         </TableCell>
                         <TableCell>{service.hrServico || '-'}</TableCell>
@@ -664,7 +719,15 @@ const ServicesManagement = () => {
                         <TableCell>{service.localSaida}</TableCell>
                         <TableCell>{service.localDestino}</TableCell>
                         <TableCell>{formatCurrency(service.valorFinal || 0)}</TableCell>
-                        <TableCell>{service.formadePagamento || '-'}</TableCell>
+                        <TableCell>
+                          {service.formadePagamento ? (
+                            <Badge className={getPaymentBadgeClass(service.formadePagamento)}>
+                              {service.formadePagamento.charAt(0).toUpperCase() + service.formadePagamento.slice(1)}
+                            </Badge>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge className={getBadgeClass(service.status)}>
                             {formatStatus(service.status)}
@@ -678,6 +741,7 @@ const ServicesManagement = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {/* CHAMADA CORRETA PARA ABRIR O MODAL DE EDIÇÃO */}
                               <DropdownMenuItem onClick={() => handleEdit(service)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
@@ -712,6 +776,42 @@ const ServicesManagement = () => {
             )}
           </CardContent>
         </Card>
+
+<CardContent>
+  {isLoading ? (
+    <p>Carregando...</p>
+  ) : filteredSortedServices && filteredSortedServices.length > 0 ? (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {/* ... (cabeçalhos da tabela) ... */}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {/* ... (corpo da tabela com a listagem dos serviços) ... */}
+        </TableBody>
+        {/* --- NOVO: RODAPÉ DA TABELA COM TOTAIS --- */}
+        <TableFooter>
+          <TableRow className="font-bold">
+            <TableCell colSpan={8}>
+              Total de Serviços ({filteredSortedServices.length}):
+            </TableCell>
+            <TableCell className="text-right">
+              {formatCurrency(filteredSortedServices.reduce((sum, service) => sum + (service.valorFinal || 0), 0))}
+            </TableCell>
+            <TableCell colSpan={3}></TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>
+    </div>
+  ) : (
+    <div className="text-center py-8">
+      <Car className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+      <p className="text-gray-500">Nenhum serviço registrado ainda.</p>
+    </div>
+  )}
+</CardContent>
       </main>
     </div>
   );

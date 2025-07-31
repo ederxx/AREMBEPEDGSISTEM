@@ -15,6 +15,8 @@ import FleetManagement from "./pages/FleetManagement";
 import DriversManagement from "./pages/DriversManagement";
 import InvoiceGeneration from "./pages/InvoiceGeneration";
 import Expenses from "./pages/Expense";
+import FluxoDeCaixaPage from "./pages/FluxodeCaixaPage";
+
 
 const queryClient = new QueryClient();
 
@@ -35,6 +37,7 @@ const App = () => (
             <Route path="/fleet" element={<FleetManagement />} />
             <Route path="/drivers" element={<DriversManagement />} />
             <Route path="/invoices" element={<InvoiceGeneration />} />
+<Route path="/fluxocaixa" element={<FluxoDeCaixaPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

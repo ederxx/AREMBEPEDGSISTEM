@@ -102,7 +102,8 @@ const Dashboard = () => {
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
     }
   });
-
+const formatCurrency = (value: number) =>
+    value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   // Aqui a correção importante para o status das despesas:
   const { data: expenses } = useQuery({
     queryKey: ['expenses'],
@@ -205,8 +206,51 @@ const totalValorFinalizado = (services || [])
   const pendingExpenses = expenses?.filter(e => e.status === 'pendente') || [];
   const overdueExpenses = expenses?.filter(e => e.status === 'vencido') || [];
  const totalExpensesValue = pendingExpenses.reduce((sum, e) => sum + e.valor, 0) || 0;
+  // Classificar as despesas
 
+   const hoje = new Date();
+  
+    const calculateStatus = (expense: Expense): 'pago' | 'pendente' | 'vencido' => {
+      const vencimento = new Date(expense.dataVencimento);
+      const pagamento = expense.dataPagamento ? new Date(expense.dataPagamento) : null;
+  
+      if (pagamento && pagamento <= hoje) return 'pago';
+      if (vencimento > hoje && (!pagamento || pagamento > hoje)) return 'pendente';
+      if (vencimento < hoje && (!pagamento || pagamento > hoje)) return 'vencido';
+      return 'pendente';
+    };
+  const classified = Array.isArray(expenses)
+  ? expenses.reduce(
+      (acc, expense) => {
+        const status = calculateStatus(expense);
+        acc.total += expense.valor;
 
+        if (status === 'pendente') {
+          acc.pendentes.count += 1;
+          acc.pendentes.total += expense.valor;
+        } else if (status === 'vencido') {
+          acc.vencidas.count += 1;
+          acc.vencidas.total += expense.valor;
+        } else if (status === 'pago') {
+          acc.pagas.count += 1;
+          acc.pagas.total += expense.valor;
+        }
+
+        return acc;
+      },
+      {
+        total: 0,
+        pendentes: { count: 0, total: 0 },
+        vencidas: { count: 0, total: 0 },
+        pagas: { count: 0, total: 0 },
+      }
+    )
+  : {
+      total: 0,
+      pendentes: { count: 0, total: 0 },
+      vencidas: { count: 0, total: 0 },
+      pagas: { count: 0, total: 0 },
+    };
   // Motoristas CNH e Curso
   const driversCNHExpiring = (drivers || []).filter(d => {
     if (!d.cnhValidade) return false;
@@ -273,42 +317,53 @@ const totalValorFinalizado = (services || [])
     </div>
   </CardContent>
 </Card>
-         
-          {/* Despesas Pendentes */}
+            {/* Total Despesas */}
           <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Despesas </CardTitle>
-              <FileText className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{pendingExpenses.length}</div>
-            </CardContent>
-          </Card>
-
-          {/* Total Despesas */}
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Despesas Pendentes</CardTitle>
+              <CardTitle className="text-sm font-medium">Despesas Pagas</CardTitle>
               <DollarSign className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                R$ {totalExpensesValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+R$ {classified.pagas.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </CardContent>
           </Card>
 
 
+          {/* Total Despesas */}
+        <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
+          <FileText className="h-4 w-4 text-yellow-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-xl font-bold text-yellow-600">
+            {classified.pendentes.count} despesa(s)
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {formatCurrency(classified.pendentes.total)}
+          </div>
+        </CardContent>
+      </Card>
+      
+
+
            {/* Despesas Vencidas */}
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/expenses')}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Despesas Vencidas</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{overdueExpenses.length}</div>
-            </CardContent>
-          </Card>
+          <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium">Vencidas</CardTitle>
+          <AlertCircle className="h-4 w-4 text-red-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-xl font-bold text-red-600">
+            {classified.vencidas.count} despesa(s)
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {formatCurrency(classified.vencidas.total)}
+          </div>
+        </CardContent>
+      </Card>
 
           {/* Serviços Hoje */}
 
@@ -386,6 +441,10 @@ const totalValorFinalizado = (services || [])
               <Button className="w-full justify-start" onClick={() => navigate('/invoices')}>
                 <DollarSign className="w-4 h-4 mr-2" />
                 Gerar Faturas
+              </Button>
+               <Button className="w-full justify-start" onClick={() => navigate('/FluxoCaixa')}>
+                <DollarSign className="w-4 h-4 mr-2" />
+                Fluxo de Caixa
               </Button>
             </CardContent>
           </Card>

@@ -57,12 +57,13 @@ const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
           <TrendingUp className="h-4 w-4 text-green-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-xl font-bold text-green-600">
-            {classified.pagas.count} despesa(s)
-          </div>
-          <div className="text-sm text-muted-foreground">
+            <div className="text-xl font-bold text-green-600">
             {formatCurrency(classified.pagas.total)}
           </div>
+          <div className="text-sm text-muted-foreground">
+            {classified.pagas.count} despesa(s)
+          </div>
+        
         </CardContent>
       </Card>
       
@@ -72,11 +73,12 @@ const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
           <FileText className="h-4 w-4 text-yellow-500" />
         </CardHeader>
         <CardContent>
+          
           <div className="text-xl font-bold text-yellow-600">
-            {classified.pendentes.count} despesa(s)
+            {formatCurrency(classified.pendentes.total)}
           </div>
           <div className="text-sm text-muted-foreground">
-            {formatCurrency(classified.pendentes.total)}
+            {classified.pendentes.count} despesa(s)
           </div>
         </CardContent>
       </Card>
@@ -87,11 +89,12 @@ const ExpenseSummary = ({ expenses }: ExpenseSummaryProps) => {
           <AlertCircle className="h-4 w-4 text-red-500" />
         </CardHeader>
         <CardContent>
+          
           <div className="text-xl font-bold text-red-600">
-            {classified.vencidas.count} despesa(s)
+            {formatCurrency(classified.vencidas.total)}
           </div>
           <div className="text-sm text-muted-foreground">
-            {formatCurrency(classified.vencidas.total)}
+            {classified.vencidas.count} despesa(s)
           </div>
         </CardContent>
       </Card>
