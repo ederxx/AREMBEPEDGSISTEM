@@ -162,12 +162,13 @@ const formatCurrency = (value: number) =>
   });
 
   const totalValorFaturado = (services || [])
-  .filter(s => s.status === 'faturado')
+  .filter(s => s.formadePagamento === 'faturado')
   .reduce((sum, s) => sum + (Number(s.valorFinal) || 0), 0);
 
 const totalValorFinalizado = (services || [])
-  .filter(s => s.status === 'finalizado')
+  .filter(s => s.formadePagamento  === 'pago')
   .reduce((sum, s) => sum + (Number(s.valorFinal) || 0), 0);
+  
 
   // Veículos com licença de turismo vencendo em até 60 dias
   const in60Days = new Date(now);
@@ -327,6 +328,9 @@ const totalValorFinalizado = (services || [])
               <div className="text-2xl font-bold text-red-600">
 R$ {classified.pagas.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
+                          <div className="text-sm text-muted-foreground">
+            {classified.pagas.count} despesa(s)
+          </div>
             </CardContent>
           </Card>
 
@@ -338,11 +342,12 @@ R$ {classified.pagas.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
           <FileText className="h-4 w-4 text-yellow-500" />
         </CardHeader>
         <CardContent>
+        
           <div className="text-xl font-bold text-yellow-600">
-            {classified.pendentes.count} despesa(s)
-          </div>
-          <div className="text-sm text-muted-foreground">
             {formatCurrency(classified.pendentes.total)}
+          </div>
+            <div className="text-sm text-muted-foreground">
+            {classified.pendentes.count} despesa(s)
           </div>
         </CardContent>
       </Card>
@@ -356,11 +361,12 @@ R$ {classified.pagas.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
           <AlertCircle className="h-4 w-4 text-red-500" />
         </CardHeader>
         <CardContent>
+         
           <div className="text-xl font-bold text-red-600">
-            {classified.vencidas.count} despesa(s)
-          </div>
-          <div className="text-sm text-muted-foreground">
             {formatCurrency(classified.vencidas.total)}
+          </div>
+           <div className="text-sm text-muted-foreground">
+            {classified.vencidas.count} despesa(s)
           </div>
         </CardContent>
       </Card>

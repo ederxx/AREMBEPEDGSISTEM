@@ -30,6 +30,7 @@ import {
   AlertCircle,
   MoreHorizontal,
   FileUp,
+  TimerIcon,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -70,7 +71,9 @@ const STATUS_OPTIONS = [
   { value: '', label: 'Todos' },
   { value: 'pago', label: 'Pago' },
   { value: 'pendente', label: 'Pendente' },
+  { value: 'programado', label: 'Programado' },
   { value: 'vencido', label: 'Vencido' },
+
 ];
 
 const MONTH_OPTIONS = [
@@ -134,18 +137,29 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
     new Set(expenses.map((e) => e.formaPagamento).filter(Boolean))
   );
 
-  const calculateStatus = (
-    expense: Expense
-  ): 'pago' | 'pendente' | 'vencido' => {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const vencimento = new Date(expense.dataVencimento);
-    vencimento.setHours(0, 0, 0, 0);
-    const pagamento = expense.dataPagamento ? new Date(expense.dataPagamento) : null;
-    if (pagamento) return 'pago';
-    if (vencimento < hoje) return 'vencido';
-    return 'pendente';
-  };
+const calculateStatus = (
+  expense: Expense
+): 'pago' | 'programado' | 'pendente' | 'vencido' => {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  const vencimento = new Date(expense.dataVencimento);
+  vencimento.setHours(0, 0, 0, 0);
+
+  const pagamento = expense.dataPagamento
+    ? new Date(expense.dataPagamento)
+    : null;
+
+  if (pagamento) {
+    pagamento.setHours(0, 0, 0, 0);
+    if (pagamento <= hoje) return 'pago';
+    if (pagamento > hoje) return 'programado';
+  }
+
+  if (!pagamento && vencimento < hoje) return 'vencido';
+
+  return 'pendente';
+};
 
   useEffect(() => {
     const userIds = Array.from(new Set(expenses.map((e) => e.userId).filter(Boolean)));
@@ -237,9 +251,11 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
       case 'pago':
         return <Badge className="bg-green-100 text-green-800">Pago</Badge>;
       case 'pendente':
-        return <Badge className="bg-yellow-100 text-yellow-800">Pendente</Badge>;
+        return <Badge className="bg-yellow-100 text-gray-800">Pendente</Badge>;
       case 'vencido':
         return <Badge className="bg-red-100 text-red-800">Vencido</Badge>;
+              case 'programado':
+        return <Badge className="bg-red-100 text-yellow-800">Programado</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
@@ -253,6 +269,8 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
         return <FileText className="w-4 h-4 text-yellow-600" />;
       case 'vencido':
         return <AlertCircle className="w-4 h-4 text-red-600" />;
+              case 'programado':
+        return <TimerIcon className="w-4 h-4 text-red-600" />;
       default:
         return null;
     }

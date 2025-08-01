@@ -28,7 +28,7 @@ interface Expense {
   valor: number;
   categoria: string;
   subcategoria: string;
-  status: 'pendente' | 'pago' | 'vencido';
+status: 'pendente' | 'pago' | 'vencido' | 'programado';
   createdAt: string;
   empresa?: string;
   funcionario?: string;
@@ -48,6 +48,7 @@ const STATUS_OPTIONS = [
   { value: '', label: 'Todos' },
   { value: 'pago', label: 'Pago' },
   { value: 'pendente', label: 'Pendente' },
+  { value: 'programado', label: 'Programado' },
   { value: 'vencido', label: 'Vencido' },
 ];
 
@@ -79,63 +80,71 @@ const ExpenseCharts = ({ expenses }: { expenses: Expense[] }) => {
     });
   };
 
-  // Filtra despesas conforme filtros selecionados
-  const filteredExpenses = useMemo(() => {
-    return expenses.filter(e => {
-      // Categoria
-      if (selectedCategoriaSet.size > 0 && !selectedCategoriaSet.has(e.categoria)) return false;
-
-      // Status
-      if (selectedStatus && e.status !== selectedStatus) return false;
-
-      // Datas vencimento
-      if (startDate && new Date(e.dataVencimento) < new Date(startDate)) return false;
-      if (endDate && new Date(e.dataVencimento) > new Date(endDate)) return false;
-
-      // Empresa
-      if (selectedEmpresa && e.empresa !== selectedEmpresa) return false;
-
-      // Funcionário
-      if (selectedFuncionario && e.funcionario !== selectedFuncionario) return false;
-
-      // Forma de pagamento
-      if (selectedFormaPagamento && e.formaPagamento !== selectedFormaPagamento) return false;
-
-      return true;
-    });
-  }, [expenses, selectedCategoriaSet, selectedStatus, startDate, endDate, selectedEmpresa, selectedFuncionario, selectedFormaPagamento]);
-
-  // Dados para gráficos (usando filteredExpenses)
-  const categoryData = Object.entries(CATEGORY_NAMES).map(([key, name]) => {
-    const categoryExpenses = filteredExpenses.filter(e => e.categoria === key);
-    const total = categoryExpenses.reduce((sum, e) => sum + e.valor, 0);
-    return {
-      name,
-      value: total,
-      count: categoryExpenses.length,
-    };
-  }).filter(item => item.value > 0);
-  const enrichedExpenses = useMemo(() => {
-  return filteredExpenses.map(e => ({
+// Enriquecer despesas com status computado
+const enrichedExpenses = useMemo(() => {
+  return expenses.map(e => ({
     ...e,
     computedStatus: calculateStatus(e),
   }));
-}, [filteredExpenses]);
+}, [expenses]);
+
+// Filtra despesas conforme filtros selecionados
+const filteredExpenses = useMemo(() => {
+  return enrichedExpenses.filter(e => {
+    // Categoria
+    if (selectedCategoriaSet.size > 0 && !selectedCategoriaSet.has(e.categoria)) return false;
+
+    // Status
+    if (selectedStatus && e.computedStatus !== selectedStatus) return false;
+
+    // Datas vencimento
+    if (startDate && new Date(e.dataVencimento) < new Date(startDate)) return false;
+    if (endDate && new Date(e.dataVencimento) > new Date(endDate)) return false;
+
+    // Empresa
+    if (selectedEmpresa && e.empresa !== selectedEmpresa) return false;
+
+    // Funcionário
+    if (selectedFuncionario && e.funcionario !== selectedFuncionario) return false;
+
+    // Forma de pagamento
+    if (selectedFormaPagamento && e.formaPagamento !== selectedFormaPagamento) return false;
+
+    return true;
+  });
+}, [enrichedExpenses, selectedCategoriaSet, selectedStatus, startDate, endDate, selectedEmpresa, selectedFuncionario, selectedFormaPagamento]);
+
+// Dados para gráficos (usando filteredExpenses)
+const categoryData = Object.entries(CATEGORY_NAMES).map(([key, name]) => {
+  const categoryExpenses = filteredExpenses.filter(e => e.categoria === key);
+  const total = categoryExpenses.reduce((sum, e) => sum + e.valor, 0);
+  return {
+    name,
+    value: total,
+    count: categoryExpenses.length,
+  };
+}).filter(item => item.value > 0);
 const statusData = [
   {
-    name: 'Pagas',
+    name: 'Pagas',        // azul
     value: enrichedExpenses.filter(e => e.computedStatus === 'pago').reduce((sum, e) => sum + e.valor, 0),
     count: enrichedExpenses.filter(e => e.computedStatus === 'pago').length,
   },
+ 
   {
-    name: 'Pendentes',
+    name: 'Vencidas',     // vermelho
+    value: enrichedExpenses.filter(e => e.computedStatus === 'vencido').reduce((sum, e) => sum + e.valor, 0),
+    count: enrichedExpenses.filter(e => e.computedStatus === 'vencido').length,
+  },
+   {
+    name: 'Pendentes',    // verde
     value: enrichedExpenses.filter(e => e.computedStatus === 'pendente').reduce((sum, e) => sum + e.valor, 0),
     count: enrichedExpenses.filter(e => e.computedStatus === 'pendente').length,
   },
   {
-    name: 'Vencidas',
-    value: enrichedExpenses.filter(e => e.computedStatus === 'vencido').reduce((sum, e) => sum + e.valor, 0),
-    count: enrichedExpenses.filter(e => e.computedStatus === 'vencido').length,
+    name: 'Programado',   // laranja
+    value: enrichedExpenses.filter(e => e.computedStatus === 'programado').reduce((sum, e) => sum + e.valor, 0),
+    count: enrichedExpenses.filter(e => e.computedStatus === 'programado').length,
   },
 ].filter(item => item.value > 0);
   const subcategoryData = filteredExpenses.reduce((acc, expense) => {
@@ -405,16 +414,32 @@ const statusData = [
   );
 };
 
-const calculateStatus = (expense: Expense): 'pago' | 'pendente' | 'vencido' => {
+const calculateStatus = (expense: Expense): 'pago' | 'pendente' | 'programado' | 'vencido' => {
   const hoje = new Date();
-  const vencimento = new Date(expense.dataVencimento);
-  const pagamento = expense.dataPagamento ? new Date(expense.dataPagamento) : null;
+  hoje.setHours(0, 0, 0, 0); // Zerar hora para comparar só a data
 
-  if (pagamento && pagamento <= hoje) return 'pago';
-  if (vencimento > hoje && (!pagamento || pagamento > hoje)) return 'pendente';
-  if (vencimento < hoje && (!pagamento || pagamento > hoje)) return 'vencido';
-  return 'pendente';
+  const vencimento = new Date(expense.dataVencimento);
+  vencimento.setHours(0, 0, 0, 0);
+
+  if (expense.dataPagamento) {
+    const pagamento = new Date(expense.dataPagamento);
+    pagamento.setHours(0, 0, 0, 0);
+
+    if (pagamento <= hoje) {
+      return 'pago'; // Já pago
+    } else {
+      return 'programado'; // Pagamento futuro programado
+    }
+  }
+
+  // Se não tem pagamento
+  if (vencimento < hoje) {
+    return 'vencido'; // Vencido
+  }
+
+  return 'pendente'; // Pendente (hoje ou futuro sem pagamento)
 };
+
 
 export default ExpenseCharts;
 
