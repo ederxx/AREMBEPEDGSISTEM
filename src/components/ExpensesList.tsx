@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import {
   Card,
@@ -100,18 +99,19 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
   const { user } = useAuth();
-  
+
   const tableRef = useRef(null);
 
   const handleExportExcel = () => {
     const dataToExport = filteredExpenses.map(expense => ({
-      Despesa: expense.nome,
       Categoria: CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES] || '-',
+      Subcategoria: expense.subcategoria || '-',
+      Despesa: expense.nome,
+      Empresa: expense.empresa || '-',
       Funcionário: expense.categoria === 'funcionarios' ? expense.funcionario || '-' : '-',
       Vencimento: expense.dataVencimento ? new Date(expense.dataVencimento).toLocaleDateString('pt-BR') : '-',
       Pagamento: expense.dataPagamento ? new Date(expense.dataPagamento).toLocaleDateString('pt-BR') : '-',
       Valor: expense.valor,
-      Empresa: expense.empresa || '-',
       'Forma de Pagamento': expense.formaPagamento || '-',
       Status: calculateStatus(expense),
     }));
@@ -119,7 +119,7 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Despesas");
-    
+
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], {type: "application/octet-stream"});
     saveAs(blob, "despesas.xlsx");
@@ -254,8 +254,8 @@ const calculateStatus = (
         return <Badge className="bg-yellow-100 text-gray-800">Pendente</Badge>;
       case 'vencido':
         return <Badge className="bg-red-100 text-red-800">Vencido</Badge>;
-              case 'programado':
-        return <Badge className="bg-red-100 text-yellow-800">Programado</Badge>;
+            case 'programado':
+        return <Badge className="bg-blue-100 text-blue-800">Programado</Badge>; // Changed from red to blue for programmed
       default:
         return <Badge>{status}</Badge>;
     }
@@ -269,8 +269,8 @@ const calculateStatus = (
         return <FileText className="w-4 h-4 text-yellow-600" />;
       case 'vencido':
         return <AlertCircle className="w-4 h-4 text-red-600" />;
-              case 'programado':
-        return <TimerIcon className="w-4 h-4 text-red-600" />;
+            case 'programado':
+        return <TimerIcon className="w-4 h-4 text-blue-600" />; // Changed from red to blue for programmed
       default:
         return null;
     }
@@ -488,13 +488,14 @@ const calculateStatus = (
             <Table className="text-sm min-w-full" ref={tableRef}>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Despesa</TableHead>
                   <TableHead>Categoria</TableHead>
+                  <TableHead>Subcategoria</TableHead>
+                  <TableHead>Despesa</TableHead>
+                  <TableHead>Empresa</TableHead>
                   <TableHead>Funcionário</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead>Pagamento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
-                  <TableHead>Empresa</TableHead>
                   <TableHead>Forma de Pagamento</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
@@ -510,10 +511,12 @@ const calculateStatus = (
                         key={expense.id}
                         className={status === 'vencido' ? 'bg-red-50 hover:bg-red-100' : undefined}
                       >
-                        <TableCell className="font-medium">{expense.nome}</TableCell>
                         <TableCell>
                           {CATEGORY_NAMES[expense.categoria as keyof typeof CATEGORY_NAMES] || '-'}
                         </TableCell>
+                        <TableCell>{expense.subcategoria || '-'}</TableCell>
+                        <TableCell className="font-medium">{expense.nome}</TableCell>
+                        <TableCell>{expense.empresa || '-'}</TableCell>
                         <TableCell>
                           {expense.categoria === 'funcionarios' && expense.funcionario
                             ? expense.funcionario
@@ -571,7 +574,6 @@ const calculateStatus = (
                         <TableCell className="font-medium text-right">
                           R$ {expense.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </TableCell>
-                        <TableCell>{expense.empresa || '-'}</TableCell>
                         <TableCell>{expense.formaPagamento || '-'}</TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
@@ -618,7 +620,7 @@ const calculateStatus = (
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center h-24">
+                    <TableCell colSpan={11} className="text-center h-24">
                       Nenhuma despesa encontrada para os filtros selecionados.
                     </TableCell>
                   </TableRow>
@@ -627,13 +629,13 @@ const calculateStatus = (
               {filteredExpenses.length > 0 && (
                 <TableFooter>
                   <TableRow className="font-bold">
-                    <TableCell colSpan={5}>Total de Despesas</TableCell>
+                    <TableCell colSpan={7}>Total de Despesas</TableCell>
                     <TableCell className="text-right">
                       R$ {filteredExpenses
                         .reduce((sum, expense) => sum + (expense.valor || 0), 0)
                         .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </TableCell>
-                    <TableCell colSpan={4}></TableCell>
+                    <TableCell colSpan={3}></TableCell>
                   </TableRow>
                 </TableFooter>
               )}
