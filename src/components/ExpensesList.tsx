@@ -521,11 +521,11 @@ const handleMarkAsPaid = (expenseId: string) => {
                             ? expense.funcionario
                             : '-'}
                         </TableCell>
-                        <TableCell>
-                          {expense.dataVencimento
-                            ? new Date(expense.dataVencimento).toLocaleDateString('pt-BR')
-                            : '-'}
-                        </TableCell>
+                       <TableCell>
+  {expense.dataVencimento
+    ? new Date(new Date(expense.dataVencimento).getTime() + 3 * 60 * 60 * 1000).toLocaleDateString('pt-BR')
+    : '-'}
+</TableCell>
                         <TableCell>
                           {isBeingEdited ? (
                             <div className="flex flex-col space-y-2">
@@ -665,4 +665,5 @@ const handleMarkAsPaid = (expenseId: string) => {
 
 
 export default ExpensesList;
+
 
