@@ -234,15 +234,16 @@ const calculateStatus = (
       toast({ title: 'Erro ao atualizar despesa', variant: 'destructive' });
     },
   });
-
-  const markAsPaidMutation.mutate({
-  id: expenseId,
-  dataPagamento: paymentDate.toISOString(), // Salva a data com hora
-});
-    } else {
-      toast({ title: 'Selecione a data de pagamento', variant: 'destructive' });
-    }
-  };
+const handleMarkAsPaid = (expenseId: string) => {
+  if (paymentDate) {
+    markAsPaidMutation.mutate({
+      id: expenseId,
+      dataPagamento: paymentDate.toISOString(), // Salva a data com hora
+    });
+  } else {
+    toast({ title: 'Selecione a data de pagamento', variant: 'destructive' });
+  }
+};
 
   const getStatusBadge = (status: string) => {
     switch (status) {
