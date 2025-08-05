@@ -238,7 +238,7 @@ const handleMarkAsPaid = (expenseId: string) => {
   if (paymentDate) {
     markAsPaidMutation.mutate({
       id: expenseId,
-      dataPagamento: paymentDate.toISOString(), // Salva a data com hora
+      dataPagamento: paymentDate.toISOString(),
     });
   } else {
     toast({ title: 'Selecione a data de pagamento', variant: 'destructive' });
@@ -665,3 +665,4 @@ const handleMarkAsPaid = (expenseId: string) => {
 
 
 export default ExpensesList;
+
