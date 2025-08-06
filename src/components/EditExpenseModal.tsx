@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Expense } from '@/types/expense';
-import { CATEGORY_NAMES } from '@/constants/expenseCategories';
+import { CATEGORY_NAMES, SUBCATEGORIES_BY_CATEGORY } from '@/constants/expenseCategories';
 
 interface EditExpenseModalProps {
   isOpen: boolean;
@@ -146,17 +146,30 @@ export function EditExpenseModal({
 
           {/* Subcategoria */}
           <div>
-            <Label>Subcategoria</Label>
-            <Input
-              value={formData.subcategoria || ''}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  subcategoria: e.target.value,
-                }))
-              }
-            />
-          </div>
+  <Label>Subcategoria</Label>
+ <Select
+  value={formData.subcategoria || ''}
+  onValueChange={(value) =>
+    setFormData((prev) => ({
+      ...prev,
+      subcategoria: value, // ✅ correto
+    }))
+  }
+  disabled={!formData.categoria || !SUBCATEGORIES_BY_CATEGORY[formData.categoria]}
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Selecione a subcategoria" />
+  </SelectTrigger>
+  <SelectContent>
+    {(SUBCATEGORIES_BY_CATEGORY[formData.categoria || ''] || []).map((sub) => (
+      <SelectItem key={sub} value={sub}>
+        {sub}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+
+</div>
 
           {/* Empresa */}
           <div>

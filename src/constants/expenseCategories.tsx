@@ -27,3 +27,10 @@ export const CATEGORY_NAMES = {
   funcionarios: 'Funcionários',
   pessoal: 'Pessoal'
 };
+
+export const SUBCATEGORIES_BY_CATEGORY: Record<string, string[]> = {
+  funcionarios: ['Salário', 'Vale Transporte', 'Vale Alimentação','outros'],
+  adm: ['Água', 'Luz', 'Internet', 'Aluguel','Equipamento', 'Material de Escritório','outros'],
+  veiculo: ['Manutenção', 'Combustível', 'Seguro', 'IPVA','outros'],
+  pessoal: ['Outros','TRF'],
+}
