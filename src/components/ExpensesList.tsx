@@ -565,9 +565,9 @@ const handleMarkAsPaid = (expenseId: string) => {
                               </div>
                             </div>
                           ) : (
-                            expense.dataPagamento
-                              ? new Date(expense.dataPagamento).getTime() + 3 * 60 * 60 * 1000).toLocaleDateString('pt-BR')
-                              : '-'
+                      expense.dataPagamento
+  ? new Date(new Date(expense.dataPagamento).getTime() + 3 * 60 * 60 * 1000).toLocaleDateString('pt-BR')
+  : '-'
                           )}
                         </TableCell>
                         <TableCell className="font-medium text-right">
