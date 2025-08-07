@@ -15,8 +15,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ptBR } from 'date-fns/locale';
-
-
+import { useQuery } from '@tanstack/react-query';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 
 // Modal simples inline para demonstração
 const Modal = ({ isOpen, onClose, children }) => {
@@ -35,72 +36,32 @@ const Modal = ({ isOpen, onClose, children }) => {
   );
 };
 
-// ... (interfaces, funções e tipos permanecem os mesmos)
-interface Expense {
-  id: string;
-  nome: string;
-  dataVencimento: string;
-  valor: number;
-  categoria: string;
-  status: string; // 'pago', 'pendente', 'vencido', 'programado'
-  empresa?: string;
-  banco?: string;
-    dataPagamento?: string; // Adicionando a propriedade dataPagamento para a lógica de status
-
-}
-
-interface Income {
-  id: string;
-  nome: string;
-  empresa: 'Arembepe' | 'DG';
-  banco: string;
-  dataVencimento: string;
-  valor: number;
-}
-
-interface FluxoDeCaixaProps {
-  expenses: Expense[];
-  incomes: Income[];
-  isLoading: boolean;
-}
-
+// As interfaces foram mantidas, mas a lógica de combinação foi para a página
 interface Transaction {
   id: string;
   date: string;
   type: 'receita' | 'despesa';
   description: string;
   value: number;
-  status?: string;
+  status: string;
   empresa?: string;
   banco?: string;
   nome: string;
+  formadePagamento?: string;
+}
+
+interface FluxoDeCaixaProps {
+  transactions: Transaction[]; // Agora recebe apenas a lista combinada e filtrada
+  isLoading: boolean;
 }
 
 function isValid(date: Date) {
   return date instanceof Date && !isNaN(date.getTime());
 }
 
-const calculateStatus = (expense) => {
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+// A função calculateStatus foi movida para o componente pai
 
-  const pagamento = expense.dataPagamento ? new Date(expense.dataPagamento) : null;
-  const vencimento = expense.dataVencimento ? new Date(expense.dataVencimento) : null;
-
-  if (pagamento) {
-    if (pagamento <= hoje) return 'pago';
-    return 'programado';
-  }
-
-  if (vencimento) {
-    if (vencimento < hoje) return 'vencido';
-  }
-
-  return 'pendente';
-};
-
-
-const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
+const FluxoDeCaixa = ({ transactions, isLoading }: FluxoDeCaixaProps) => {
   const navigate = useNavigate();
 
   // Estados de Filtro
@@ -110,82 +71,14 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  // Lógica para combinar e ordenar transações
-  const transactions = useMemo(() => {
-    // Adicionei a verificação de status para as despesas
-    const relevantExpenses = expenses.filter(exp => exp.status === 'pago' || exp.status === undefined); 
-    const combined: Transaction[] = [
-      ...relevantExpenses.map(exp => ({
-        id: exp.id,
-        date: exp.dataVencimento,
-        type: 'despesa' as const,
-        description: exp.nome,
-        value: exp.valor,
-        status: exp.status,
-        empresa: exp.empresa,
-        banco: exp.banco,
-        nome: exp.nome,
-      })),
-      ...incomes.map(inc => ({
-        id: inc.id,
-        date: inc.dataVencimento,
-        type: 'receita' as const,
-        description: inc.nome,
-        value: inc.valor,
-        empresa: inc.empresa,
-        banco: inc.banco,
-        nome: inc.nome,
-      })),
-    ];
-
-    combined.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    return combined;
-  }, [expenses, incomes]);
-
-  // Lógica para classificar despesas (sua lógica adicionada aqui)
-  const classifiedExpenses = useMemo(() => {
-    return expenses.reduce(
-      (acc, expense) => {
-        const status = calculateStatus(expense);
-
-        if (status === 'pago') {
-          acc.pagas.count += 1;
-          acc.pagas.total += expense.valor;
-        } else if (status === 'programado') {
-          acc.programadas.count += 1;
-          acc.programadas.total += expense.valor;
-        } else if (status === 'vencido') {
-          acc.vencidas.count += 1;
-          acc.vencidas.total += expense.valor;
-        } else {
-          acc.pendentes.count += 1;
-          acc.pendentes.total += expense.valor;
-        }
-        acc.total.count += 1;
-        acc.total.total += expense.valor;
-
-        return acc;
-      },
-      {
-        total: { count: 0, total: 0 },
-        pagas: { count: 0, total: 0 },
-        programadas: { count: 0, total: 0 },
-        vencidas: { count: 0, total: 0 },
-        pendentes: { count: 0, total: 0 },
-      }
-    );
-  }, [expenses]);
-  
-  // Lógica para filtrar transações
+  // A lógica de filtragem da interface agora atua sobre a lista recebida
   const filteredTransactions = useMemo(() => {
     // Função para normalizar empresa
     const normalizeEmpresa = (empresa?: string) => {
       if (!empresa) return '';
       const lower = empresa.trim().toLowerCase();
-
       if (lower.includes('arembepe')) return 'Arembepe';
       if (lower.includes('dg')) return 'DG';
-
       return empresa.trim();
     };
 
@@ -218,16 +111,27 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
       return { ...t, saldoAcumulado: saldo };
     });
   }, [filteredTransactions]);
-
-  const totalReceita = filteredTransactions
-    .filter(t => t.type === 'receita')
-    .reduce((sum, t) => sum + t.value, 0);
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: async (): Promise<Service[]> => {
+      const snapshot = await getDocs(collection(db, 'services'));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+    }
+  });
+const totalReceita = (services || [])
+  .filter(s => s.formadePagamento  === 'pago')
+  .reduce((sum, s) => sum + (Number(s.valorFinal) || 0), 0);
+  
 
   const totalDespesa = filteredTransactions
     .filter(t => t.type === 'despesa')
     .reduce((sum, t) => sum + t.value, 0);
 
   const saldoFinal = totalReceita - totalDespesa;
+
+  // Lógica de despesas pagas agora precisa de um cálculo diferente, pois só recebemos as transações pagas.
+  // Você pode ter um estado para o total de despesas pagas ou passar a lógica de cálculo do pai
+  // Por enquanto, vou remover o card de despesas pagas, já que o novo array de transações não contém mais todas as despesas.
 
   // Lógica do Modal de Edição (mantida)
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -245,13 +149,17 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
     alert('Alteração salva! (implemente a atualização real)');
   }
 
-  function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-    const { name, value } = e.target;
-    setEditingTransaction(prev =>
-      prev ? { ...prev, [name]: name === 'valor' ? parseFloat(value) || 0 : value } : null
-    );
-  }
-
+function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  const { name, value } = e.target;
+  setEditingTransaction(prev =>
+    prev
+      ? {
+          ...prev,
+          [name]: name === 'value' ? parseFloat(value) || 0 : value,
+        }
+      : null
+  );
+}
   if (isLoading) {
     return (
       <Card>
@@ -271,18 +179,8 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
 
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        {/* Adicionando o card de despesas pagas */}
-        <Card className="bg-red-50 border-red-400">
-          <CardHeader>
-            <CardTitle className="text-red-800">Despesas Pagas</CardTitle>
-          </CardHeader>
-<CardContent className="text-red-700 font-bold text-2xl">
-            R$ {classifiedExpenses.pagas.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            <div className="text-sm font-normal text-red-600">
-              {classifiedExpenses.pagas.count} despesa(s)
-            </div>
-          </CardContent>
-        </Card>
+        {/* Card de Despesas Pagas foi removido porque o componente FluxoDeCaixa não tem mais acesso a todas as despesas, apenas as que já estão combinadas e filtradas. */}
+        {/* <Card className="bg-red-50 border-red-400">...</Card> */}
 
         <Card className="bg-green-50 border-green-400">
           <CardHeader>
@@ -292,7 +190,7 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
             R$ {totalReceita.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </CardContent>
         </Card>
-{/* 
+
         <Card className="bg-red-50 border-red-400">
           <CardHeader>
             <CardTitle className="text-red-800">Total de Despesas</CardTitle>
@@ -301,7 +199,7 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
             R$ {totalDespesa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </CardContent>
         </Card>
- */}
+
         <Card className="bg-gray-100 border-gray-400">
           <CardHeader>
             <CardTitle>Saldo Atual</CardTitle>
@@ -372,7 +270,7 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
             <TableHeader>
               <TableRow className="bg-gray-100">
                 <TableHead className="text-center font-bold">Data</TableHead>
-                <TableHead className="text-center font-bold">Tipo</TableHead> {/* NOVO */}
+                <TableHead className="text-center font-bold">Tipo</TableHead>
                 <TableHead className="font-bold">Descrição</TableHead>
                 <TableHead className="text-center font-bold">Empresa</TableHead>
                 <TableHead className="text-center font-bold">Banco</TableHead>
@@ -417,11 +315,11 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
                     >
                       R$ {t.saldoAcumulado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </TableCell>
-                   {/* <TableCell className="text-center">
+                    <TableCell className="text-center">
                       <Button size="sm" variant="outline" onClick={() => openEditModal(t)}>
                         Editar
                       </Button>
-                    </TableCell> */}
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (

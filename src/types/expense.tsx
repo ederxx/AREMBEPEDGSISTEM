@@ -11,7 +11,7 @@ export interface Expense {
   userId?: string;
     createdAt?: any;
        funcionario?: string;
-  status?: 'pendente' | 'pago' | 'vencido';
+  status?: string;
 }
 
 export interface ExpenseFormData {
