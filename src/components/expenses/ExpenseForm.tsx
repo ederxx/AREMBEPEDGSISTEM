@@ -318,9 +318,9 @@ console.log('Funcionários disponíveis:', employeeNames);
           <SelectValue placeholder="Selecione a forma de pagamento" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="Bradesco">Bradesco</SelectItem>
-          <SelectItem value="Brasil">Brasil</SelectItem>
-          <SelectItem value="Pix">Pix</SelectItem>
+          <SelectItem value="Bradesco">Banco Bradesco</SelectItem>
+          <SelectItem value="Brasil">Banco do Brasil</SelectItem>
+          <SelectItem value="Cartão de Credito">Cartão de Credito</SelectItem>
           <SelectItem value="À Vista">À Vista</SelectItem>
         </SelectContent>
       </Select>

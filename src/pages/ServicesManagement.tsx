@@ -423,7 +423,7 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
               setIsModalOpen(true); // Abre o modal
             }}>
               <Plus className="w-4 h-4 mr-2" />
-              Registrar Serviço
+              Registrar Receita
             </Button>
           </div>
         </div>

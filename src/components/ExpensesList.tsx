@@ -54,6 +54,49 @@ import {
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { ptBR } from 'date-fns/locale';
+import { getDocs, collection} from 'firebase/firestore';
+import {  query, limit, startAfter,  getFirestore, DocumentSnapshot, orderBy } from 'firebase/firestore';
+
+// atulizando despesas no banco de dados
+ const expensesRef = collection(db, 'expenses');
+const PAGE_SIZE = 50; // Altere conforme necessário
+
+async function atualizarFormaPagamentoPaginado() {
+  let lastDoc: DocumentSnapshot | null = null;
+  let totalAtualizados = 0;
+  let pagina = 1;
+
+  while (true) {
+    const q = lastDoc
+      ? query(expensesRef, orderBy('formaPagamento'), startAfter(lastDoc), limit(PAGE_SIZE))
+      : query(expensesRef, orderBy('formaPagamento'), limit(PAGE_SIZE));
+
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) break;
+
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const pagamento = (data.formaPagamento || '').trim().toLowerCase();
+
+      if (pagamento === 'bradesco') {
+        await updateDoc(doc.ref, {
+          formaPagamento: 'Banco Bradesco',
+        });
+        console.log(`✔️ Atualizado: ${doc.id}`);
+        totalAtualizados++;
+      }
+    }
+
+    lastDoc = snapshot.docs[snapshot.docs.length - 1];
+    console.log(`📄 Página ${pagina++} processada.`);
+  }
+
+  console.log(`✅ Total de documentos atualizados: ${totalAtualizados}`);
+} 
+
+atualizarFormaPagamentoPaginado().catch(console.error);
+
 
 interface ExpensesListProps {
   expenses: Expense[];
@@ -333,8 +376,15 @@ const handleMarkAsPaid = (expenseId: string) => {
     );
   }
 
+
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
+
+{/*       
+      <button onClick={atualizarDespesasSemStatus} className="bg-blue-500 text-white px-4 py-2 rounded">
+  Corrigir status das despesas
+</button> */}
+
       {/* FILTROS */}
       <Card>
         <CardHeader>

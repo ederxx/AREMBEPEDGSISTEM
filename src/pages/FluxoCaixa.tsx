@@ -45,6 +45,8 @@ interface Expense {
   status: string; // 'pago', 'pendente', 'vencido', 'programado'
   empresa?: string;
   banco?: string;
+    dataPagamento?: string; // Adicionando a propriedade dataPagamento para a lógica de status
+
 }
 
 interface Income {
@@ -78,6 +80,26 @@ function isValid(date: Date) {
   return date instanceof Date && !isNaN(date.getTime());
 }
 
+const calculateStatus = (expense) => {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  const pagamento = expense.dataPagamento ? new Date(expense.dataPagamento) : null;
+  const vencimento = expense.dataVencimento ? new Date(expense.dataVencimento) : null;
+
+  if (pagamento) {
+    if (pagamento <= hoje) return 'pago';
+    return 'programado';
+  }
+
+  if (vencimento) {
+    if (vencimento < hoje) return 'vencido';
+  }
+
+  return 'pendente';
+};
+
+
 const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
   const navigate = useNavigate();
 
@@ -90,7 +112,8 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
 
   // Lógica para combinar e ordenar transações
   const transactions = useMemo(() => {
- const relevantExpenses = expenses.filter(exp => exp.status === 'pago' || exp.status === undefined);
+    // Adicionei a verificação de status para as despesas
+    const relevantExpenses = expenses.filter(exp => exp.status === 'pago' || exp.status === undefined); 
     const combined: Transaction[] = [
       ...relevantExpenses.map(exp => ({
         id: exp.id,
@@ -119,26 +142,60 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
     return combined;
   }, [expenses, incomes]);
 
+  // Lógica para classificar despesas (sua lógica adicionada aqui)
+  const classifiedExpenses = useMemo(() => {
+    return expenses.reduce(
+      (acc, expense) => {
+        const status = calculateStatus(expense);
+
+        if (status === 'pago') {
+          acc.pagas.count += 1;
+          acc.pagas.total += expense.valor;
+        } else if (status === 'programado') {
+          acc.programadas.count += 1;
+          acc.programadas.total += expense.valor;
+        } else if (status === 'vencido') {
+          acc.vencidas.count += 1;
+          acc.vencidas.total += expense.valor;
+        } else {
+          acc.pendentes.count += 1;
+          acc.pendentes.total += expense.valor;
+        }
+        acc.total.count += 1;
+        acc.total.total += expense.valor;
+
+        return acc;
+      },
+      {
+        total: { count: 0, total: 0 },
+        pagas: { count: 0, total: 0 },
+        programadas: { count: 0, total: 0 },
+        vencidas: { count: 0, total: 0 },
+        pendentes: { count: 0, total: 0 },
+      }
+    );
+  }, [expenses]);
+  
   // Lógica para filtrar transações
   const filteredTransactions = useMemo(() => {
     // Função para normalizar empresa
-const normalizeEmpresa = (empresa?: string) => {
-  if (!empresa) return '';
-  const lower = empresa.trim().toLowerCase();
+    const normalizeEmpresa = (empresa?: string) => {
+      if (!empresa) return '';
+      const lower = empresa.trim().toLowerCase();
 
-  if (lower.includes('arembepe')) return 'Arembepe';
-  if (lower.includes('dg')) return 'DG';
+      if (lower.includes('arembepe')) return 'Arembepe';
+      if (lower.includes('dg')) return 'DG';
 
-  return empresa.trim();
-};
+      return empresa.trim();
+    };
 
     return transactions.filter(t => {
       if (filterType !== 'all' && t.type !== filterType) return false;
-    if (
-  filterEmpresa !== 'all' &&
-  normalizeEmpresa(t.empresa).toLowerCase() !== filterEmpresa.toLowerCase()
-)
-  return false;
+      if (
+        filterEmpresa !== 'all' &&
+        normalizeEmpresa(t.empresa).toLowerCase() !== filterEmpresa.toLowerCase()
+      )
+        return false;
       if (
         filterBanco.trim() !== '' &&
         t.banco?.toLowerCase().indexOf(filterBanco.toLowerCase()) === -1
@@ -211,9 +268,22 @@ const normalizeEmpresa = (empresa?: string) => {
         </Button>
         <h1 className="text-2xl font-bold">Extrato de Movimentações</h1>
       </div>
-      
+
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {/* Adicionando o card de despesas pagas */}
+        <Card className="bg-red-50 border-red-400">
+          <CardHeader>
+            <CardTitle className="text-red-800">Despesas Pagas</CardTitle>
+          </CardHeader>
+<CardContent className="text-red-700 font-bold text-2xl">
+            R$ {classifiedExpenses.pagas.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <div className="text-sm font-normal text-red-600">
+              {classifiedExpenses.pagas.count} despesa(s)
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="bg-green-50 border-green-400">
           <CardHeader>
             <CardTitle className="text-green-800">Total de Receitas</CardTitle>
@@ -222,7 +292,7 @@ const normalizeEmpresa = (empresa?: string) => {
             R$ {totalReceita.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </CardContent>
         </Card>
-
+{/* 
         <Card className="bg-red-50 border-red-400">
           <CardHeader>
             <CardTitle className="text-red-800">Total de Despesas</CardTitle>
@@ -231,7 +301,7 @@ const normalizeEmpresa = (empresa?: string) => {
             R$ {totalDespesa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </CardContent>
         </Card>
-
+ */}
         <Card className="bg-gray-100 border-gray-400">
           <CardHeader>
             <CardTitle>Saldo Atual</CardTitle>
@@ -347,7 +417,7 @@ const normalizeEmpresa = (empresa?: string) => {
                     >
                       R$ {t.saldoAcumulado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </TableCell>
-                   {/*  <TableCell className="text-center">
+                   {/* <TableCell className="text-center">
                       <Button size="sm" variant="outline" onClick={() => openEditModal(t)}>
                         Editar
                       </Button>
