@@ -4,6 +4,13 @@
   padding: 2rem;
   text-align: center;
 }
+thead, tr {
+  display: table-header-group !important;
+}
+th, td {
+  display: table-cell !important;
+  vertical-align: middle;
+}
 
 .logo {
   height: 6em;

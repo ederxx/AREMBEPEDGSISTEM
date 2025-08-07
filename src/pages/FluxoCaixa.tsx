@@ -4,7 +4,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -15,17 +14,12 @@ import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ptBR } from 'date-fns/locale';
+
+
 
 // Modal simples inline para demonstração
-const Modal = ({
-  isOpen,
-  onClose,
-  children,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-}) => {
+const Modal = ({ isOpen, onClose, children }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -41,6 +35,7 @@ const Modal = ({
   );
 };
 
+// ... (interfaces, funções e tipos permanecem os mesmos)
 interface Expense {
   id: string;
   nome: string;
@@ -79,59 +74,23 @@ interface Transaction {
   nome: string;
 }
 
+function isValid(date: Date) {
+  return date instanceof Date && !isNaN(date.getTime());
+}
+
 const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
-  const [manualIncomes, setManualIncomes] = useState<Income[]>([]);
-  const [formData, setFormData] = useState({
-    nome: '',
-    empresa: 'Arembepe',
-    banco: '',
-    dataVencimento: '',
-    valor: '',
-  });
+  const navigate = useNavigate();
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddIncome = () => {
-    if (
-      !formData.nome.trim() ||
-      !formData.banco.trim() ||
-      !formData.dataVencimento.trim() ||
-      !formData.valor.trim() ||
-      isNaN(Number(formData.valor)) ||
-      Number(formData.valor) <= 0
-    ) {
-      alert('Por favor, preencha todos os campos corretamente.');
-      return;
-    }
-
-    const newIncome: Income = {
-      id: Date.now().toString(),
-      nome: formData.nome,
-      empresa: formData.empresa as 'Arembepe' | 'DG',
-      banco: formData.banco,
-      dataVencimento: formData.dataVencimento,
-      valor: parseFloat(formData.valor),
-    };
-    setManualIncomes(prev => [...prev, newIncome]);
-    setFormData({ nome: '', empresa: 'Arembepe', banco: '', dataVencimento: '', valor: '' });
-  };
-
+  // Estados de Filtro
+  const [filterType, setFilterType] = useState<'all' | 'receita' | 'despesa'>('all');
   const [filterEmpresa, setFilterEmpresa] = useState<'all' | 'Arembepe' | 'DG'>('all');
   const [filterBanco, setFilterBanco] = useState<string>('');
-  const navigate = useNavigate();
-  const [filterType, setFilterType] = useState<'all' | 'receita' | 'despesa'>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
+  // Lógica para combinar e ordenar transações
   const transactions = useMemo(() => {
-    const relevantExpenses = expenses.filter(exp => exp.status === 'pago' || exp.status === undefined);
-
+ const relevantExpenses = expenses.filter(exp => exp.status === 'pago' || exp.status === undefined);
     const combined: Transaction[] = [
       ...relevantExpenses.map(exp => ({
         id: exp.id,
@@ -144,7 +103,7 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
         banco: exp.banco,
         nome: exp.nome,
       })),
-      ...[...incomes, ...manualIncomes].map(inc => ({
+      ...incomes.map(inc => ({
         id: inc.id,
         date: inc.dataVencimento,
         type: 'receita' as const,
@@ -158,13 +117,32 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
 
     combined.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return combined;
-  }, [expenses, incomes, manualIncomes]);
+  }, [expenses, incomes]);
 
+  // Lógica para filtrar transações
   const filteredTransactions = useMemo(() => {
+    // Função para normalizar empresa
+const normalizeEmpresa = (empresa?: string) => {
+  if (!empresa) return '';
+  const lower = empresa.trim().toLowerCase();
+
+  if (lower.includes('arembepe')) return 'Arembepe';
+  if (lower.includes('dg')) return 'DG';
+
+  return empresa.trim();
+};
+
     return transactions.filter(t => {
       if (filterType !== 'all' && t.type !== filterType) return false;
-      if (filterEmpresa !== 'all' && t.empresa !== filterEmpresa) return false;
-      if (filterBanco.trim() !== '' && t.banco?.toLowerCase().indexOf(filterBanco.toLowerCase()) === -1)
+    if (
+  filterEmpresa !== 'all' &&
+  normalizeEmpresa(t.empresa).toLowerCase() !== filterEmpresa.toLowerCase()
+)
+  return false;
+      if (
+        filterBanco.trim() !== '' &&
+        t.banco?.toLowerCase().indexOf(filterBanco.toLowerCase()) === -1
+      )
         return false;
 
       const tDate = parseISO(t.date);
@@ -175,20 +153,28 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
     });
   }, [transactions, filterType, startDate, endDate, filterEmpresa, filterBanco]);
 
-  // Função auxiliar para validar datas
-  function isValid(date: Date) {
-    return date instanceof Date && !isNaN(date.getTime());
-  }
+  // Cálculo de saldo e totais
+  const transacoesComSaldo = useMemo(() => {
+    let saldo = 0;
+    return filteredTransactions.map((t) => {
+      saldo += t.type === 'receita' ? t.value : -t.value;
+      return { ...t, saldoAcumulado: saldo };
+    });
+  }, [filteredTransactions]);
 
   const totalReceita = filteredTransactions
     .filter(t => t.type === 'receita')
     .reduce((sum, t) => sum + t.value, 0);
 
   const totalDespesa = filteredTransactions
-    .filter(t => t.type === 'despesa' && (t.status === 'pago' || t.status === undefined))
-    .reduce((sum, t) => sum + (Number(t.value) || 0), 0);
+    .filter(t => t.type === 'despesa')
+    .reduce((sum, t) => sum + t.value, 0);
 
   const saldoFinal = totalReceita - totalDespesa;
+
+  // Lógica do Modal de Edição (mantida)
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   function openEditModal(transaction: Transaction) {
     setEditingTransaction(transaction);
@@ -219,62 +205,14 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
 
   return (
     <div className="space-y-6">
-      <Button variant="outline" onClick={() => navigate('/dashboard')}>
-        Voltar ao Dashboard
-      </Button>
-
-      {/* Form de receita manual */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Adicionar Receita Manual</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div>
-            <Label>Nome</Label>
-            <Input name="nome" value={formData.nome} onChange={handleInputChange} />
-          </div>
-          <div>
-            <Label>Empresa</Label>
-            <select
-              name="empresa"
-              value={formData.empresa}
-              onChange={handleInputChange}
-              className="border rounded px-2 py-1 w-full"
-            >
-              <option value="Arembepe">Arembepe</option>
-              <option value="DG">DG</option>
-            </select>
-          </div>
-          <div>
-            <Label>Banco</Label>
-            <Input name="banco" value={formData.banco} onChange={handleInputChange} />
-          </div>
-          <div>
-            <Label>Data do Pagamento</Label>
-            <Input
-              name="dataVencimento"
-              type="date"
-              value={formData.dataVencimento}
-              onChange={handleInputChange}
-            />
-          </div>
-          <div>
-            <Label>Valor</Label>
-            <Input
-              name="valor"
-              type="number"
-              step="0.01"
-              value={formData.valor}
-              onChange={handleInputChange}
-            />
-          </div>
-          <div className="flex items-end">
-            <Button onClick={handleAddIncome}>Adicionar Receita</Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Cards resumo */}
+      <div className="flex justify-between items-center">
+        <Button variant="outline" onClick={() => navigate('/dashboard')}>
+          Voltar ao Dashboard
+        </Button>
+        <h1 className="text-2xl font-bold">Extrato de Movimentações</h1>
+      </div>
+      
+      {/* Cards de Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="bg-green-50 border-green-400">
           <CardHeader>
@@ -296,7 +234,7 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
 
         <Card className="bg-gray-100 border-gray-400">
           <CardHeader>
-            <CardTitle>Saldo em Caixa</CardTitle>
+            <CardTitle>Saldo Atual</CardTitle>
           </CardHeader>
           <CardContent
             className={`font-bold text-2xl ${
@@ -308,110 +246,125 @@ const FluxoDeCaixa = ({ expenses, incomes, isLoading }: FluxoDeCaixaProps) => {
         </Card>
       </div>
 
-      {/* Tabelas lado a lado */}
-      <div className="flex flex-col sm:flex-row gap-6">
-        {/* Receitas */}
-        <Card className="flex-1">
-          <CardHeader>
-            <CardTitle>Receitas do Período</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table className="text-sm min-w-full">
-              <TableHead>
-                <TableRow>
-                  <TableHeader className="text-center">Data</TableHeader>
-                  <TableHeader>Descrição</TableHeader>
-                  <TableHeader className="text-center">Empresa</TableHeader>
-                  <TableHeader className="text-center">Banco</TableHeader>
-                  <TableHeader className="text-right">Valor (R$)</TableHeader>
-                  <TableHeader className="text-center">Ações</TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredTransactions.filter(t => t.type === 'receita').length > 0 ? (
-                  filteredTransactions
-                    .filter(t => t.type === 'receita')
-                    .map(t => (
-                      <TableRow key={t.id} className="hover:bg-gray-50 transition-colors duration-200">
-                        <TableCell className="text-center font-medium">
-                          {t.date && isValid(parseISO(t.date)) ? format(parseISO(t.date), 'dd/MM/yyyy') : '-'}
-                        </TableCell>
-                        <TableCell>{t.description}</TableCell>
-                        <TableCell className="text-center">{t.empresa || '-'}</TableCell>
-                        <TableCell className="text-center">{t.banco || '-'}</TableCell>
-                        <TableCell className="text-right font-mono text-green-700">
-                          R$ {t.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Button size="sm" variant="outline" onClick={() => openEditModal(t)}>
-                            Editar
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      Nenhuma receita encontrada.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      {/* Seção de Filtros */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtros</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <Label>Tipo</Label>
+            <Select
+              value={filterType}
+              onValueChange={(v) => setFilterType(v as 'all' | 'receita' | 'despesa')}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="receita">Receita</SelectItem>
+                <SelectItem value="despesa">Despesa</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Empresa</Label>
+            <Select value={filterEmpresa} onValueChange={v => setFilterEmpresa(v as 'all' | 'Arembepe' | 'DG')}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="Arembepe">Arembepe</SelectItem>
+                <SelectItem value="DG">DG</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Data de Início</Label>
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </div>
+          <div>
+            <Label>Data de Fim</Label>
+            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Despesas */}
-        <Card className="flex-1">
-          <CardHeader>
-            <CardTitle>Despesas do Período</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table className="text-sm min-w-full">
-              <TableHead>
-                <TableRow>
-                  <TableHeader className="text-center">Data</TableHeader>
-                  <TableHeader>Descrição</TableHeader>
-                  <TableHeader className="text-center">Empresa</TableHeader>
-                  <TableHeader className="text-center">Banco</TableHeader>
-                  <TableHeader className="text-right">Valor (R$)</TableHeader>
-                  <TableHeader className="text-center">Ações</TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredTransactions.filter(t => t.type === 'despesa').length > 0 ? (
-                  filteredTransactions
-                    .filter(t => t.type === 'despesa')
-                    .map(t => (
-                      <TableRow key={t.id} className="hover:bg-gray-50 transition-colors duration-200">
-                        <TableCell className="text-center font-medium">
-                          {t.date && isValid(parseISO(t.date)) ? format(parseISO(t.date), 'dd/MM/yyyy') : '-'}
-                        </TableCell>
-                        <TableCell>{t.description}</TableCell>
-                        <TableCell className="text-center">{t.empresa || '-'}</TableCell>
-                        <TableCell className="text-center">{t.banco || '-'}</TableCell>
-                        <TableCell className="text-right font-mono text-red-700">
-                          R$ {t.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Button size="sm" variant="outline" onClick={() => openEditModal(t)}>
-                            Editar
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      Nenhuma despesa encontrada.
+      {/* Tabela estilo extrato bancário com saldo acumulado */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Histórico de Transações</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table className="text-sm min-w-full">
+            <TableHeader>
+              <TableRow className="bg-gray-100">
+                <TableHead className="text-center font-bold">Data</TableHead>
+                <TableHead className="text-center font-bold">Tipo</TableHead> {/* NOVO */}
+                <TableHead className="font-bold">Descrição</TableHead>
+                <TableHead className="text-center font-bold">Empresa</TableHead>
+                <TableHead className="text-center font-bold">Banco</TableHead>
+                <TableHead className="text-right font-bold">Valor (R$)</TableHead>
+                <TableHead className="text-right font-bold">Saldo Acumulado (R$)</TableHead>
+                <TableHead className="text-center font-bold">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transacoesComSaldo.length > 0 ? (
+                transacoesComSaldo.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="text-center font-medium">
+                      {t.date && isValid(parseISO(t.date)) ? format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                     </TableCell>
+                    <TableCell className="text-center">
+                      <span
+                        className={
+                          t.type === 'receita'
+                            ? 'px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-semibold'
+                            : 'px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-semibold'
+                        }
+                      >
+                        {t.type === 'receita' ? 'Receita' : 'Despesa'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="capitalize">{t.description}</TableCell>
+                    <TableCell className="text-center">{t.empresa || '-'}</TableCell>
+                    <TableCell className="text-center">{t.banco || '-'}</TableCell>
+                    <TableCell
+                      className={`text-right font-mono ${
+                        t.type === 'receita' ? 'text-green-700' : 'text-red-700'
+                      }`}
+                    >
+                      {t.type === 'despesa' ? '-' : '+'}
+                      R$ {t.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right font-mono ${
+                        t.saldoAcumulado >= 0 ? 'text-green-700' : 'text-red-700'
+                      }`}
+                    >
+                      R$ {t.saldoAcumulado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                   {/*  <TableCell className="text-center">
+                      <Button size="sm" variant="outline" onClick={() => openEditModal(t)}>
+                        Editar
+                      </Button>
+                    </TableCell> */}
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    Nenhuma transação encontrada com os filtros aplicados.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Modal de edição */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
