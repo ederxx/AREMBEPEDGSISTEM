@@ -14,6 +14,7 @@ import { db } from '@/config/firebase';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from "jspdf";
 import { format, isWithinInterval, parseISO } from 'date-fns';
+import logo from '../imagens/logo.jpg'; // Importe a logo que você deseja usar
 
 // Componente principal para a geração de faturas.
 const InvoiceGeneration = () => {
@@ -125,105 +126,158 @@ const InvoiceGeneration = () => {
       const now = new Date();
       const dataFormatada = format(now, "dd/MM/yyyy");
 
-      let yOffset = 20;
+      // Adiciona a logo no topo
+      const img = new Image();
+      img.src = logo;
+      img.onload = function () {
+        const logoWidth = 40;
+        const logoHeight = 24;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 14;
+        const yHeader = 14;
 
-      // Adiciona o nome da empresa e a data de emissão
-      doc.setFontSize(18);
-      doc.setFont("helvetica", "bold");
-      doc.text(empresaNome, doc.internal.pageSize.width - 14, yOffset, { align: 'right' });
-      yOffset += 10;
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Data de Emissão: ${dataFormatada}`, doc.internal.pageSize.width - 14, yOffset, { align: 'right' });
-      yOffset += 10;
-      
-      // Linha separadora
-      doc.setDrawColor(200, 200, 200);
-      doc.line(14, yOffset, doc.internal.pageSize.width - 14, yOffset);
-      yOffset += 10;
+        // Logo à esquerda
+        doc.addImage(img, 'JPEG', margin, yHeader, logoWidth, logoHeight);
 
-      // Adiciona os detalhes bancários.
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text('Dados Bancários:', 14, yOffset);
-      yOffset += 5;
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      if (bankData.banco) doc.text(`Banco: ${bankData.banco}`, 14, yOffset += 5);
-      if (bankData.agencia) doc.text(`Agência: ${bankData.agencia}`, 14, yOffset += 5);
-      if (bankData.conta) doc.text(`Conta: ${bankData.conta}`, 14, yOffset += 5);
-      if (bankData.pix) doc.text(`PIX: ${bankData.pix}`, 14, yOffset += 5);
-      yOffset += 10;
+        // Nome da empresa emissora logo abaixo da logo, à esquerda
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text(empresaNome, margin, yHeader + logoHeight + 8); // 8px abaixo da logo
 
-      // Adiciona a tabela de serviços incluídos.
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text('Serviços Incluídos:', 14, yOffset);
-      yOffset += 5; // Espaço antes da tabela
+        // Data de emissão à direita
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Data de Emissão: ${dataFormatada}`, pageWidth - margin, yHeader + 6, { align: 'right' });
 
-      const tableColumn = ["Empresa", "Serviço", "Data Início", "Data Fim", "Valor"];
-      const tableRows = selectedServicesData.map(service => {
-        if (!service) return ['', '', '', '', ''];
-        return [
-          String(service.nomeEmpresa || ''),
-          String(service.tipoServico || ''),
-          formatDateTime(service.dataInicio),
-          formatDateTime(service.dataFim),
-          formatCurrency(service.valorFinal || 0),
-        ];
-      });
+        // Próxima linha após o cabeçalho
+        let yOffset = yHeader + logoHeight + 22; // espaço após logo e nome emissora
 
-      const startX = 14;
-      const cellWidths = [35, 35, 45, 45, 20];
-      const rowHeight = 6;
-      const headerFillColor = [20, 138, 146];
-      const headerTextColor = [255, 255, 255];
-      const cellFillColor = [255, 255, 255];
-      const alternateFillColor = [240, 240, 240];
+        // Empresa faturada e referência de datas
+        // Extrai o nome da empresa faturada dos serviços selecionados
+        const empresaFaturada = selectedServicesData.length > 0 ? selectedServicesData[0].nomeEmpresa : '';
+        // Monta referência de datas, se houver filtro
+        const referencia = (filterDataInicio && filterDataFim)
+          ? `Referência: ${format(parseISO(filterDataInicio), "dd/MM/yyyy")} a ${format(parseISO(filterDataFim), "dd/MM/yyyy")}`
+          : '';
 
-      // Desenha o cabeçalho da tabela
-      doc.setFillColor(headerFillColor[0], headerFillColor[1], headerFillColor[2]);
-      doc.rect(startX, yOffset, cellWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
-      doc.setTextColor(headerTextColor[0], headerTextColor[1], headerTextColor[2]);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "bold");
-      let currentX = startX;
-      tableColumn.forEach((col, index) => {
-        doc.text(col, currentX + 2, yOffset + rowHeight / 2 + 1.5);
-        currentX += cellWidths[index];
-      });
-      
-      yOffset += rowHeight;
+        if (empresaFaturada) {
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "bold");
+          doc.text(`Empresa Faturada: ${empresaFaturada}`, margin, yOffset);
+          yOffset += 9;
+        }
+        if (referencia) {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.text(referencia, margin, yOffset);
+          yOffset += 9;
+        }
 
-      // Desenha as linhas de dados
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(0, 0, 0);
-      tableRows.forEach((row, rowIndex) => {
-        const fillColor = rowIndex % 2 === 0 ? cellFillColor : alternateFillColor;
-        doc.setFillColor(fillColor[0], fillColor[1], fillColor[2]);
-        doc.rect(startX, yOffset, cellWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
-        
-        currentX = startX;
-        row.forEach((cell, cellIndex) => {
-          doc.text(cell, currentX + 2, yOffset + rowHeight / 2 + 1.5);
-          currentX += cellWidths[cellIndex];
+        // Linha separadora
+        doc.setDrawColor(180, 180, 180);
+        doc.line(margin, yOffset, pageWidth - margin, yOffset);
+        yOffset += 12;
+
+        // Dados Bancários
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text('Dados Bancários:', margin, yOffset);
+        yOffset += 8;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        if (bankData.banco) doc.text(`Banco: ${bankData.banco}`, margin, yOffset += 8);
+        if (bankData.agencia) doc.text(`Agência: ${bankData.agencia}`, margin, yOffset += 8);
+        if (bankData.conta) doc.text(`Conta: ${bankData.conta}`, margin, yOffset += 8);
+        if (bankData.pix) doc.text(`PIX: ${bankData.pix}`, margin, yOffset += 8);
+        yOffset += 12;
+
+        // Linha separadora
+        doc.setDrawColor(180, 180, 180);
+        doc.line(margin, yOffset, pageWidth - margin, yOffset);
+        yOffset += 12;
+
+        // Tabela de serviços incluídos
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text('Serviços Incluídos:', margin, yOffset);
+        yOffset += 10;
+
+        // Cabeçalho da tabela
+        const tableColumn = ["Data", "Hora", "Serviço", "Motorista", "Veículo", "Valor"];
+        const cellWidths = [22, 15, 38, 35, 35, 22];
+        const rowHeight = 7;
+        const headerFillColor: [number, number, number] = [20, 138, 146];
+        const headerTextColor: [number, number, number] = [255, 255, 255];
+        const cellFillColor: [number, number, number] = [255, 255, 255];
+        const alternateFillColor: [number, number, number] = [240, 240, 240];
+
+        doc.setFillColor(...headerFillColor);
+        doc.rect(margin, yOffset, cellWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
+        doc.setTextColor(...headerTextColor);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        let currentX = margin;
+        tableColumn.forEach((col, index) => {
+          doc.text(col, currentX + 2, yOffset + rowHeight / 2 + 2);
+          currentX += cellWidths[index];
         });
         yOffset += rowHeight;
-      });
 
-      yOffset += 10; // Espaço antes do total
-      // Linha separadora antes do total
-      doc.setDrawColor(200, 200, 200);
-      doc.line(doc.internal.pageSize.width / 2, yOffset, doc.internal.pageSize.width - 14, yOffset);
-      yOffset += 5;
+        // Linhas da tabela
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        const tableRows = selectedServicesData.map(service => {
+          const dataObj = service.dataInicio ? new Date(service.dataInicio) : null;
+          return [
+            dataObj ? format(dataObj, "dd/MM/yyyy") : '',
+            dataObj ? format(dataObj, "HH:mm") : '',
+            service.tipoServico ? String(service.tipoServico) : '—',
+            service.motorista ? String(service.motorista) : '—',
+            service.veiculo ? String(service.veiculo) : '—',
+            formatCurrency(service.valorFinal || 0),
+          ];
+        });
+        tableRows.forEach((row, rowIndex) => {
+          const fillColor = rowIndex % 2 === 0 ? cellFillColor : alternateFillColor;
+          doc.setFillColor(...fillColor);
+          doc.rect(margin, yOffset, cellWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
+          currentX = margin;
+          row.forEach((cell, cellIndex) => {
+            doc.text(cell, currentX + 2, yOffset + rowHeight / 2 + 2);
+            currentX += cellWidths[cellIndex];
+          });
+          yOffset += rowHeight;
+        });
 
-      // Adiciona o total no final
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text(`Total: ${formatCurrency(totalValue)}`, doc.internal.pageSize.width - 14, yOffset, { align: 'right' });
-      
-      doc.save(`fatura-${dataFormatada}.pdf`);
-      toast({ title: 'Sucesso', description: 'Fatura gerada com sucesso!' });
+        // Espaço extra após a tabela
+        yOffset += 24;
+
+        // Linha separadora antes do total
+        doc.setDrawColor(180, 180, 180);
+        doc.line(pageWidth / 2, yOffset, pageWidth - margin, yOffset);
+        yOffset += 12;
+
+        // Total
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text(`Total: ${formatCurrency(totalValue)}`, pageWidth - margin, yOffset, { align: 'right' });
+
+        // Assinatura
+        yOffset += 18;
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "normal");
+        doc.text('Assinatura:', margin, yOffset);
+        yOffset += 10;
+        doc.setFont("helvetica", "bold");
+        doc.text('Egildo A da Cruz', margin, yOffset);
+
+        doc.save(`fatura-${dataFormatada}.pdf`);
+        toast({ title: 'Sucesso', description: 'Fatura gerada com sucesso!' });
+      };
+      img.onerror = function () {
+        toast({ title: 'Erro', description: 'Erro ao carregar a logo.', variant: 'destructive' });
+      };
     } catch (err: any) {
       console.error("Erro ao gerar fatura:", err);
       toast({ title: 'Erro', description: `Falha ao gerar fatura: ${err.message || 'Erro desconhecido'}`, variant: 'destructive' });
