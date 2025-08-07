@@ -32,7 +32,7 @@ const BackupDownloader = () => {
     setStatus('Coletando dados...');
 
     try {
-      const collectionNames = ['vehicles', 'drivers', 'services', 'quotes', 'depositos', 'expenses', 'garage','users'];
+      const collectionNames = ['vehicles', 'drivers', 'services', 'quotes', 'depositos', 'expenses', 'garages','users'];
       const backupData: Record<string, any[]> = {};
 
       for (const colName of collectionNames) {
