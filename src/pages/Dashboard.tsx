@@ -438,7 +438,7 @@ R$ {classified.pagas.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
               </Button>
               <Button className="w-full justify-start" onClick={() => navigate('/services')}>
                 <Calendar className="w-4 h-4 mr-2" />
-                Serviços Realizados
+                Receitas
               </Button>
               <Button className="w-full justify-start" onClick={() => navigate('/expenses')}>
                 <DollarSign className="w-4 h-4 mr-2" />

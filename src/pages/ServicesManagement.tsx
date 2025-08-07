@@ -125,12 +125,24 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
     queryFn: async () => {
       const snapshot = await getDocs(collection(db, 'services'));
       return snapshot.docs
-        .map(doc => {
-          const data = doc.data();
+        .map(docSnap => {
+          const data = docSnap.data();
           return {
-            id: doc.id,
-            ...data,
-            status: data.status || 'pendente' // garante que o status sempre tenha um valor
+            id: docSnap.id,
+            nomeEmpresa: data.nomeEmpresa || '',
+            dataInicio: data.dataInicio || '',
+            dataFim: data.dataFim || '',
+            tipoCarro: data.tipoCarro || '',
+            motorista: data.motorista || '',
+            numeroPassageiros: data.numeroPassageiros || '',
+            localSaida: data.localSaida || '',
+            localDestino: data.localDestino || '',
+            hrServico: data.hrServico || '',
+            valorFinal: data.valorFinal || 0,
+            status: data.status || 'pendente',
+            formadePagamento: data.formadePagamento || '',
+            observacoes: data.observacoes || '',
+            // Inclua outros campos necessários aqui
           };
         });
     }
@@ -604,7 +616,7 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
             <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="w-5 h-5" />
-                Lista de Serviços
+                Receitas - Serviços, Contratos e outras receitas.
               </CardTitle>
               <div className="flex items-center gap-4 flex-wrap">
                 <Input
@@ -615,7 +627,7 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
                 />
 
                 {/* --- NOVO: FILTRO DE STATUS --- */}
-                <Select value={filterStatus} onValueChange={(value: 'all' | 'agendado' | 'em_andamento' | 'finalizado' | 'cancelado' | 'pendente') => setFilterStatus(value)}>
+                <Select value={filterStatus} onValueChange={(value) => setFilterStatus(value as 'all' | 'em_andamento' | 'finalizado' | 'cancelado')}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -683,7 +695,7 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
                       <TableHead className="min-w-[140px]text-xs px-2 py-1">Veículo</TableHead>
                       <TableHead className="min-w-[140px]text-xs px-2 py-1">Motorista</TableHead>
                       <TableHead className="w-[80px]text-xs px-2 py-1">Passageiros</TableHead>
-                      <TableHead className="w-[80px]text-xs px-2 py-1">Saída</TableHead>
+                      <TableHead className="w-[80px]text-xs px-2 py-1">Receita</TableHead>
                       <TableHead className="w-[80px]text-xs px-2 py-1">Destino</TableHead>
                       <TableHead
                         className="w-[100px] cursor-pointer"

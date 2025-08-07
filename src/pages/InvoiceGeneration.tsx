@@ -14,7 +14,8 @@ import { db } from '@/config/firebase';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from "jspdf";
 import { format, isWithinInterval, parseISO } from 'date-fns';
-import logo from '../imagens/logo.jpg'; // Importe a logo que você deseja usar
+import logoAre from '../imagens/are.jpg';
+import logoDg from '../imagens/dg.jpg';
 
 // Componente principal para a geração de faturas.
 const InvoiceGeneration = () => {
@@ -51,6 +52,8 @@ const InvoiceGeneration = () => {
     },
     enabled: !!user
   });
+
+  
 
   // Filtra os serviços com base nos critérios de empresa e datas.
   const filteredServices = services?.filter(service => {
@@ -127,8 +130,14 @@ const InvoiceGeneration = () => {
       const dataFormatada = format(now, "dd/MM/yyyy");
 
       // Adiciona a logo no topo
-      const img = new Image();
-      img.src = logo;
+      const logoMap: Record<string, string> = {
+        arembepe: logoAre,
+        dg: logoDg,
+      };
+      const logoSrc = logoMap[bankData.empresaEmissora] || logoAre; // fallback para are
+
+      const img = new window.Image();
+      img.src = logoSrc;
       img.onload = function () {
         const logoWidth = 40;
         const logoHeight = 24;
@@ -178,23 +187,6 @@ const InvoiceGeneration = () => {
         doc.line(margin, yOffset, pageWidth - margin, yOffset);
         yOffset += 12;
 
-        // Dados Bancários
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text('Dados Bancários:', margin, yOffset);
-        yOffset += 8;
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        if (bankData.banco) doc.text(`Banco: ${bankData.banco}`, margin, yOffset += 8);
-        if (bankData.agencia) doc.text(`Agência: ${bankData.agencia}`, margin, yOffset += 8);
-        if (bankData.conta) doc.text(`Conta: ${bankData.conta}`, margin, yOffset += 8);
-        if (bankData.pix) doc.text(`PIX: ${bankData.pix}`, margin, yOffset += 8);
-        yOffset += 12;
-
-        // Linha separadora
-        doc.setDrawColor(180, 180, 180);
-        doc.line(margin, yOffset, pageWidth - margin, yOffset);
-        yOffset += 12;
 
         // Tabela de serviços incluídos
         doc.setFontSize(12);
@@ -232,9 +224,9 @@ const InvoiceGeneration = () => {
           return [
             dataObj ? format(dataObj, "dd/MM/yyyy") : '',
             dataObj ? format(dataObj, "HH:mm") : '',
-            service.tipoServico ? String(service.tipoServico) : '—',
+            service.localSaida? String(service.localSaida) : '—',
             service.motorista ? String(service.motorista) : '—',
-            service.veiculo ? String(service.veiculo) : '—',
+            service.tipoCarro ? String(service.tipoCarro) : '—',
             formatCurrency(service.valorFinal || 0),
           ];
         });
@@ -263,14 +255,35 @@ const InvoiceGeneration = () => {
         doc.setFont("helvetica", "bold");
         doc.text(`Total: ${formatCurrency(totalValue)}`, pageWidth - margin, yOffset, { align: 'right' });
 
-        // Assinatura
+        // Espaço antes dos dados bancários
         yOffset += 18;
+
+        // Dados Bancários (agora abaixo do total)
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text('Dados Bancários:', margin, yOffset);
+        yOffset += 8;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        if (bankData.banco) doc.text(`Banco: ${bankData.banco}`, margin, yOffset += 8);
+        if (bankData.agencia) doc.text(`Agência: ${bankData.agencia}`, margin, yOffset += 8);
+        if (bankData.conta) doc.text(`Conta: ${bankData.conta}`, margin, yOffset += 8);
+        if (bankData.pix) doc.text(`PIX: ${bankData.pix}`, margin, yOffset += 8);
+        yOffset += 12;
+
+        // Espaço antes da assinatura
+        yOffset += 10;
+
+        // Assinatura personalizada
         doc.setFontSize(12);
         doc.setFont("helvetica", "normal");
-        doc.text('Assinatura:', margin, yOffset);
-        yOffset += 10;
+        doc.text('Atenciosamente', margin, yOffset);
+        yOffset += 12;
         doc.setFont("helvetica", "bold");
-        doc.text('Egildo A da Cruz', margin, yOffset);
+        doc.text('Egildo Anunciação da Cruz', margin, yOffset);
+        yOffset += 10;
+        doc.setFont("helvetica", "normal");
+        doc.text('Sócio gerente.', margin, yOffset);
 
         doc.save(`fatura-${dataFormatada}.pdf`);
         toast({ title: 'Sucesso', description: 'Fatura gerada com sucesso!' });
