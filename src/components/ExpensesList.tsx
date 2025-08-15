@@ -189,20 +189,28 @@ const calculateStatus = (
   const vencimento = new Date(expense.dataVencimento);
   vencimento.setHours(0, 0, 0, 0);
 
-  const pagamento = expense.dataPagamento
-    ? new Date(expense.dataPagamento)
-    : null;
+  // Só considera pagamento se for uma data válida
+  const pagamento =
+    expense.dataPagamento && !isNaN(new Date(expense.dataPagamento).getTime())
+      ? new Date(expense.dataPagamento)
+      : null;
 
+  // Se tem data de pagamento válida
   if (pagamento) {
     pagamento.setHours(0, 0, 0, 0);
     if (pagamento <= hoje) return 'pago';
     if (pagamento > hoje) return 'programado';
   }
 
-  if (!pagamento && vencimento < hoje) return 'vencido';
+  // Se NÃO tem pagamento
+  if (!pagamento) {
+    if (vencimento < hoje) return 'vencido'; // venceu e não pagou
+    return 'pendente'; // ainda vai vencer e não pagou
+  }
 
   return 'pendente';
 };
+
 
   useEffect(() => {
     const userIds = Array.from(new Set(expenses.map((e) => e.userId).filter(Boolean)));
