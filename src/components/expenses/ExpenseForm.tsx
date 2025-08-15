@@ -122,7 +122,7 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
   empresa: formData.empresa,
   formaPagamento: formData.formaPagamento,
   dataVencimento: formData.dataVencimento ? format(formData.dataVencimento, 'yyyy-MM-dd') : undefined,
-  dataPagamento: formData.dataPagamento ? format(formData.dataPagamento, 'yyyy-MM-dd') : undefined,
+dataPagamento: formData.dataPagamento ? format(formData.dataPagamento, 'yyyy-MM-dd') : null,
 funcionario: formData.funcionario || null, // opcional
   userId: user?.uid || '',           // salva o uid do usuário
   userName: user?.displayName || '', // salva o nome do usuário
@@ -427,3 +427,4 @@ console.log('Funcionários disponíveis:', employeeNames);
 };
 
 export default ExpenseForm;
+
