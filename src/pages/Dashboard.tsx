@@ -307,7 +307,7 @@ const totalValorFinalizado = (services || [])
   </CardHeader>
   <CardContent>
     <div className="space-y-1">
-      <div className="text-sm text-blue-600">Finalizados:</div>
+      <div className="text-sm text-blue-600">Pagos:</div>
       <div className="text-xl font-bold text-blue-600">
         R$ {totalValorFinalizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
       </div>

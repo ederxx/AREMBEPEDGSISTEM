@@ -7,12 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Calendar, Car, FileText, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, Car, FileText, ArrowUp, ArrowDown,Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { useToast } from '@/hooks/use-toast';
+import * as XLSX from 'xlsx'; // Adicione esta linha
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +35,32 @@ const ServicesManagement = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+const handleExportExcel = () => {
+    // Mapeia os dados filtrados e ordenados para o formato do Excel
+    const dataToExport = filteredSortedServices.map(service => ({
+      'Nome da Empresa': service.nomeEmpresa,
+      'Período do Serviço': `${formatDate(service.dataInicio)}${service.dataFim ? ` até ${formatDate(service.dataFim)}` : ''}`,
+      'Hora do Serviço': service.hrServico || '-',
+      'Veículo': service.tipoCarro,
+      'Motorista': service.motorista,
+      'Número de Passageiros': service.numeroPassageiros,
+      'Local de Saída': service.localSaida || '-',
+      'Local de Destino': service.localDestino || '-',
+      'Valor Final (R$)': service.valorFinal || 0,
 
+      'Forma de Pagamento': service.formadePagamento ? service.formadePagamento.charAt(0).toUpperCase() + service.formadePagamento.slice(1) : '-',
+      'Status': formatStatus(service.status),
+      'Observações': service.observacoes || '-',
+    }));
+
+    // Cria a planilha e o arquivo de Excel
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Serviços');
+    
+    // Escreve o arquivo e força o download
+    XLSX.writeFile(workbook, 'servicos_agencia.xlsx');
+  };
   // --- ALTERAR O ESTADO AQUI ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<any>(null);
@@ -417,15 +443,23 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
               <h1 className="text-2xl font-bold text-teal-primary">Serviços Realizados</h1>
             </div>
             {/* O BOTÃO QUE ABRE O MODAL */}
-            <Button onClick={() => {
-              setEditingService(null); // Garante que é um novo registro
-              resetForm(); // Limpa o formulário
-              setIsModalOpen(true); // Abre o modal
-            }}>
-              <Plus className="w-4 h-4 mr-2" />
-              Registrar Receita
-            </Button>
-          </div>
+        <div className="flex space-x-2">
+              {/* BOTÃO PARA EXPORTAR PARA EXCEL */}
+              <Button onClick={handleExportExcel} variant="outline" className="text-sm">
+                <Download className="w-4 h-4 mr-2" />
+                Exportar para Excel
+              </Button>
+              {/* O BOTÃO QUE ABRE O MODAL */}
+              <Button onClick={() => {
+                setEditingService(null);
+                resetForm();
+                setIsModalOpen(true);
+              }}>
+                <Plus className="w-4 h-4 mr-2" />
+                Registrar Receita
+              </Button>
+              </div>
+            </div>
         </div>
       </header>
 

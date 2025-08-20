@@ -54,7 +54,13 @@ interface FluxoDeCaixaProps {
   transactions: Transaction[]; // Agora recebe apenas a lista combinada e filtrada
   isLoading: boolean;
 }
-
+interface Service {
+  id: string;
+  nomeEmpresa: string;
+  formadePagamento: string;
+  valorFinal: number;
+  // Adicione aqui outros campos do seu documento 'services' se precisar deles em outros lugares do código
+}
 function isValid(date: Date) {
   return date instanceof Date && !isNaN(date.getTime());
 }
