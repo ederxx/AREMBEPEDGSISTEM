@@ -190,6 +190,13 @@ const InvoiceGeneration = () => {
         doc.text('Serviços Incluídos:', margin, yOffset);
         yOffset += 10;
 
+        // **AQUI ESTÁ A ÚNICA ALTERAÇÃO, A ORDENAÇÃO POR DATA.**
+        const sortedServicesData = selectedServicesData.sort((a, b) => {
+          const dateA = new Date(a.dataInicio);
+          const dateB = new Date(b.dataInicio);
+          return dateA.getTime() - dateB.getTime();
+        });
+
         // AUMENTEI a largura da coluna de "Motorista" para 50
         // e DIMINUÍ a de "Veículo" para 20
         const tableColumn = ["Data", "Hora", "Serviço", "Motorista", "Veículo", "Valor"];
@@ -214,7 +221,7 @@ const InvoiceGeneration = () => {
 
         // Desenha as linhas da tabela
         doc.setTextColor(0, 0, 0).setFontSize(9).setFont("helvetica", "normal");
-        selectedServicesData.forEach((service, rowIndex) => {
+        sortedServicesData.forEach((service, rowIndex) => {
           // Verifica se precisa adicionar uma nova página antes de desenhar a linha
           if (yOffset + rowHeight > doc.internal.pageSize.getHeight() - 40) {
             doc.addPage();
@@ -239,20 +246,19 @@ const InvoiceGeneration = () => {
 
           const dataObj = service.dataInicio ? new Date(service.dataInicio) : null;
 
-          // **LÓGICA ATUALIZADA AQUI**
           const motoristaNomeCompleto = service.motorista || '—';
           const nomeSeparado = motoristaNomeCompleto.split(' ');
           let motoristaFormatado = motoristaNomeCompleto;
           if (nomeSeparado.length > 1) {
             motoristaFormatado = `${nomeSeparado[0]} ${nomeSeparado[nomeSeparado.length - 1]}`;
           }
-const tipoCarroFormatado = service.tipoCarro ? service.tipoCarro.split(' ')[0] : '—';
-const rowData = [
+          const tipoCarroFormatado = service.tipoCarro ? service.tipoCarro.split(' ')[0] : '—';
+          const rowData = [
             dataObj ? format(dataObj, "dd/MM/yyyy") : '',
             dataObj ? format(dataObj, "HH:mm") : '',
             service.localSaida || '—',
             motoristaFormatado, // Usando o nome formatado
-             tipoCarroFormatado,
+            tipoCarroFormatado,
             formatCurrency(service.valorFinal || 0),
           ];
 
