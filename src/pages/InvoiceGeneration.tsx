@@ -53,8 +53,6 @@ const InvoiceGeneration = () => {
     enabled: !!user
   });
 
-  
-
   // Filtra os serviços com base nos critérios de empresa e datas.
   const filteredServices = services?.filter(service => {
     const empresaMatch = filterEmpresa ? service.nomeEmpresa === filterEmpresa : true;
@@ -129,7 +127,16 @@ const InvoiceGeneration = () => {
       const now = new Date();
       const dataFormatada = format(now, "dd/MM/yyyy");
 
-      // Adiciona a logo no topo
+      // Definições de layout
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 14;
+      const lineHeight = 7; // Altura padrão de uma linha de texto
+
+      // --- Cabeçalho da Fatura ---
+      let yOffset = 14;
+      const logoWidth = 40;
+      const logoHeight = 24;
+
       const logoMap: Record<string, string> = {
         arembepe: logoAre,
         dg: logoDg,
@@ -139,47 +146,38 @@ const InvoiceGeneration = () => {
       const img = new window.Image();
       img.src = logoSrc;
       img.onload = function () {
-        const logoWidth = 40;
-        const logoHeight = 24;
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const margin = 14;
-        const yHeader = 14;
-
         // Logo à esquerda
-        doc.addImage(img, 'JPEG', margin, yHeader, logoWidth, logoHeight);
+        doc.addImage(img, 'JPEG', margin, yOffset, logoWidth, logoHeight);
 
-        // Nome da empresa emissora logo abaixo da logo, à esquerda
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text(empresaNome, margin, yHeader + logoHeight + 8); // 8px abaixo da logo
+        // Nome da empresa emissora
+        doc.setFontSize(12).setFont("helvetica", "bold");
+        doc.text(empresaNome, margin, yOffset + logoHeight + 8);
 
-        // Data de emissão à direita
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.text(`Data de Emissão: ${dataFormatada}`, pageWidth - margin, yHeader + 6, { align: 'right' });
+        // Data de emissão alinhada à direita
+        doc.setFontSize(10).setFont("helvetica", "normal");
+        doc.text(`Data de Emissão: ${dataFormatada}`, pageWidth - margin, yOffset + 6, { align: 'right' });
 
-        // Próxima linha após o cabeçalho
-        let yOffset = yHeader + logoHeight + 22; // espaço após logo e nome emissora
+        // Atualiza yOffset após o cabeçalho
+        yOffset += logoHeight + 22;
 
-        // Empresa faturada e referência de datas
-        // Extrai o nome da empresa faturada dos serviços selecionados
-        const empresaFaturada = selectedServicesData.length > 0 ? selectedServicesData[0].nomeEmpresa : '';
-        // Monta referência de datas, se houver filtro
+
+        // --- Informações de Referência ---
+        // Empresa faturada
+        const empresaFaturada = selectedServicesData[0]?.nomeEmpresa || '';
+        if (empresaFaturada) {
+          doc.setFontSize(12).setFont("helvetica", "bold");
+          doc.text(`Empresa Faturada: ${empresaFaturada}`, margin, yOffset);
+          yOffset += lineHeight;
+        }
+
+        // Referência de datas
         const referencia = (filterDataInicio && filterDataFim)
           ? `Referência: ${format(parseISO(filterDataInicio), "dd/MM/yyyy")} a ${format(parseISO(filterDataFim), "dd/MM/yyyy")}`
           : '';
-
-        if (empresaFaturada) {
-          doc.setFontSize(12);
-          doc.setFont("helvetica", "bold");
-          doc.text(`Empresa Faturada: ${empresaFaturada}`, margin, yOffset);
-          yOffset += 9;
-        }
         if (referencia) {
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10).setFont("helvetica", "normal");
           doc.text(referencia, margin, yOffset);
-          yOffset += 9;
+          yOffset += lineHeight + 5; // Espaço extra após a referência
         }
 
         // Linha separadora
@@ -187,27 +185,26 @@ const InvoiceGeneration = () => {
         doc.line(margin, yOffset, pageWidth - margin, yOffset);
         yOffset += 12;
 
-
-        // Tabela de serviços incluídos
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
+        // --- Tabela de Serviços ---
+        doc.setFontSize(12).setFont("helvetica", "bold");
         doc.text('Serviços Incluídos:', margin, yOffset);
         yOffset += 10;
 
-        // Cabeçalho da tabela
+        // AUMENTEI a largura da coluna de "Motorista" para 50
+        // e DIMINUÍ a de "Veículo" para 20
         const tableColumn = ["Data", "Hora", "Serviço", "Motorista", "Veículo", "Valor"];
-        const cellWidths = [22, 15, 38, 35, 35, 22];
+        const cellWidths = [22, 15, 38, 50, 20, 22];
         const rowHeight = 7;
         const headerFillColor: [number, number, number] = [20, 138, 146];
         const headerTextColor: [number, number, number] = [255, 255, 255];
         const cellFillColor: [number, number, number] = [255, 255, 255];
         const alternateFillColor: [number, number, number] = [240, 240, 240];
 
+        // Desenha o cabeçalho da tabela
         doc.setFillColor(...headerFillColor);
         doc.rect(margin, yOffset, cellWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
-        doc.setTextColor(...headerTextColor);
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...headerTextColor).setFontSize(9).setFont("helvetica", "bold");
+
         let currentX = margin;
         tableColumn.forEach((col, index) => {
           doc.text(col, currentX + 2, yOffset + rowHeight / 2 + 2);
@@ -215,27 +212,52 @@ const InvoiceGeneration = () => {
         });
         yOffset += rowHeight;
 
-        // Linhas da tabela
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(0, 0, 0);
-        const tableRows = selectedServicesData.map(service => {
-          const dataObj = service.dataInicio ? new Date(service.dataInicio) : null;
-          return [
-            dataObj ? format(dataObj, "dd/MM/yyyy") : '',
-            dataObj ? format(dataObj, "HH:mm") : '',
-            service.localSaida? String(service.localSaida) : '—',
-            service.motorista ? String(service.motorista) : '—',
-            service.tipoCarro ? String(service.tipoCarro) : '—',
-            formatCurrency(service.valorFinal || 0),
-          ];
-        });
-        tableRows.forEach((row, rowIndex) => {
+        // Desenha as linhas da tabela
+        doc.setTextColor(0, 0, 0).setFontSize(9).setFont("helvetica", "normal");
+        selectedServicesData.forEach((service, rowIndex) => {
+          // Verifica se precisa adicionar uma nova página antes de desenhar a linha
+          if (yOffset + rowHeight > doc.internal.pageSize.getHeight() - 40) {
+            doc.addPage();
+            yOffset = 14;
+
+            // Recriar cabeçalho da tabela na nova página
+            doc.setFillColor(...headerFillColor);
+            doc.rect(margin, yOffset, cellWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
+            doc.setTextColor(...headerTextColor).setFontSize(9).setFont("helvetica", "bold");
+            let tempX = margin;
+            tableColumn.forEach((col, index) => {
+              doc.text(col, tempX + 2, yOffset + rowHeight / 2 + 2);
+              tempX += cellWidths[index];
+            });
+            yOffset += rowHeight;
+            doc.setTextColor(0, 0, 0).setFontSize(9).setFont("helvetica", "normal");
+          }
+
           const fillColor = rowIndex % 2 === 0 ? cellFillColor : alternateFillColor;
           doc.setFillColor(...fillColor);
           doc.rect(margin, yOffset, cellWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
+
+          const dataObj = service.dataInicio ? new Date(service.dataInicio) : null;
+
+          // **LÓGICA ATUALIZADA AQUI**
+          const motoristaNomeCompleto = service.motorista || '—';
+          const nomeSeparado = motoristaNomeCompleto.split(' ');
+          let motoristaFormatado = motoristaNomeCompleto;
+          if (nomeSeparado.length > 1) {
+            motoristaFormatado = `${nomeSeparado[0]} ${nomeSeparado[nomeSeparado.length - 1]}`;
+          }
+const tipoCarroFormatado = service.tipoCarro ? service.tipoCarro.split(' ')[0] : '—';
+const rowData = [
+            dataObj ? format(dataObj, "dd/MM/yyyy") : '',
+            dataObj ? format(dataObj, "HH:mm") : '',
+            service.localSaida || '—',
+            motoristaFormatado, // Usando o nome formatado
+             tipoCarroFormatado,
+            formatCurrency(service.valorFinal || 0),
+          ];
+
           currentX = margin;
-          row.forEach((cell, cellIndex) => {
+          rowData.forEach((cell, cellIndex) => {
             doc.text(cell, currentX + 2, yOffset + rowHeight / 2 + 2);
             currentX += cellWidths[cellIndex];
           });
@@ -245,38 +267,29 @@ const InvoiceGeneration = () => {
         // Espaço extra após a tabela
         yOffset += 24;
 
-        // Linha separadora antes do total
+        // --- Seção de Total ---
         doc.setDrawColor(180, 180, 180);
         doc.line(pageWidth / 2, yOffset, pageWidth - margin, yOffset);
         yOffset += 12;
 
-        // Total
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14).setFont("helvetica", "bold");
         doc.text(`Total: ${formatCurrency(totalValue)}`, pageWidth - margin, yOffset, { align: 'right' });
-
-        // Espaço antes dos dados bancários
         yOffset += 18;
 
-        // Dados Bancários (agora abaixo do total)
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
+        // --- Dados Bancários ---
+        doc.setFontSize(12).setFont("helvetica", "bold");
         doc.text('Dados Bancários:', margin, yOffset);
         yOffset += 8;
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10).setFont("helvetica", "normal");
         if (bankData.banco) doc.text(`Banco: ${bankData.banco}`, margin, yOffset += 8);
         if (bankData.agencia) doc.text(`Agência: ${bankData.agencia}`, margin, yOffset += 8);
         if (bankData.conta) doc.text(`Conta: ${bankData.conta}`, margin, yOffset += 8);
         if (bankData.pix) doc.text(`PIX: ${bankData.pix}`, margin, yOffset += 8);
+
         yOffset += 12;
 
-        // Espaço antes da assinatura
-        yOffset += 10;
-
-        // Assinatura personalizada
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "normal");
+        // --- Assinatura ---
+        doc.setFontSize(12).setFont("helvetica", "normal");
         doc.text('Atenciosamente', margin, yOffset);
         yOffset += 12;
         doc.setFont("helvetica", "bold");
@@ -285,6 +298,7 @@ const InvoiceGeneration = () => {
         doc.setFont("helvetica", "normal");
         doc.text('Sócio gerente.', margin, yOffset);
 
+        // Salva o documento
         doc.save(`fatura-${dataFormatada}.pdf`);
         toast({ title: 'Sucesso', description: 'Fatura gerada com sucesso!' });
       };
