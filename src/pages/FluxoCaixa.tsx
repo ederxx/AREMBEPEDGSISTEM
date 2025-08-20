@@ -15,9 +15,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ptBR } from 'date-fns/locale';
-import { useQuery } from '@tanstack/react-query';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 
 // Modal simples inline para demonstração
 const Modal = ({ isOpen, onClose, children }) => {
@@ -36,7 +33,6 @@ const Modal = ({ isOpen, onClose, children }) => {
   );
 };
 
-// As interfaces foram mantidas, mas a lógica de combinação foi para a página
 interface Transaction {
   id: string;
   date: string;
@@ -51,35 +47,25 @@ interface Transaction {
 }
 
 interface FluxoDeCaixaProps {
-  transactions: Transaction[]; // Agora recebe apenas a lista combinada e filtrada
+  transactions: Transaction[];
   isLoading: boolean;
 }
-interface Service {
-  id: string;
-  nomeEmpresa: string;
-  formadePagamento: string;
-  valorFinal: number;
-  // Adicione aqui outros campos do seu documento 'services' se precisar deles em outros lugares do código
-}
+
 function isValid(date: Date) {
   return date instanceof Date && !isNaN(date.getTime());
 }
 
-// A função calculateStatus foi movida para o componente pai
-
 const FluxoDeCaixa = ({ transactions, isLoading }: FluxoDeCaixaProps) => {
   const navigate = useNavigate();
 
-  // Estados de Filtro
   const [filterType, setFilterType] = useState<'all' | 'receita' | 'despesa'>('all');
   const [filterEmpresa, setFilterEmpresa] = useState<'all' | 'Arembepe' | 'DG'>('all');
   const [filterBanco, setFilterBanco] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  // A lógica de filtragem da interface agora atua sobre a lista recebida
+  // **ALTERAÇÃO AQUI:** O filtro agora é mais específico e seguro
   const filteredTransactions = useMemo(() => {
-    // Função para normalizar empresa
     const normalizeEmpresa = (empresa?: string) => {
       if (!empresa) return '';
       const lower = empresa.trim().toLowerCase();
@@ -89,6 +75,11 @@ const FluxoDeCaixa = ({ transactions, isLoading }: FluxoDeCaixaProps) => {
     };
 
     return transactions.filter(t => {
+      // Agora removemos apenas se for 'receita' E 'faturado'.
+      if (t.type === 'receita' && t.formadePagamento === 'faturado') {
+        return false;
+      }
+      
       if (filterType !== 'all' && t.type !== filterType) return false;
       if (
         filterEmpresa !== 'all' &&
@@ -109,7 +100,6 @@ const FluxoDeCaixa = ({ transactions, isLoading }: FluxoDeCaixaProps) => {
     });
   }, [transactions, filterType, startDate, endDate, filterEmpresa, filterBanco]);
 
-  // Cálculo de saldo e totais
   const transacoesComSaldo = useMemo(() => {
     let saldo = 0;
     return filteredTransactions.map((t) => {
@@ -117,17 +107,10 @@ const FluxoDeCaixa = ({ transactions, isLoading }: FluxoDeCaixaProps) => {
       return { ...t, saldoAcumulado: saldo };
     });
   }, [filteredTransactions]);
-  const { data: services } = useQuery({
-    queryKey: ['services'],
-    queryFn: async (): Promise<Service[]> => {
-      const snapshot = await getDocs(collection(db, 'services'));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-    }
-  });
-const totalReceita = (services || [])
-  .filter(s => s.formadePagamento  === 'pago')
-  .reduce((sum, s) => sum + (Number(s.valorFinal) || 0), 0);
-  
+
+  const totalReceita = filteredTransactions
+    .filter(t => t.type === 'receita')
+    .reduce((sum, t) => sum + (Number(t.value) || 0), 0);
 
   const totalDespesa = filteredTransactions
     .filter(t => t.type === 'despesa')
@@ -135,11 +118,6 @@ const totalReceita = (services || [])
 
   const saldoFinal = totalReceita - totalDespesa;
 
-  // Lógica de despesas pagas agora precisa de um cálculo diferente, pois só recebemos as transações pagas.
-  // Você pode ter um estado para o total de despesas pagas ou passar a lógica de cálculo do pai
-  // Por enquanto, vou remover o card de despesas pagas, já que o novo array de transações não contém mais todas as despesas.
-
-  // Lógica do Modal de Edição (mantida)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
@@ -155,17 +133,18 @@ const totalReceita = (services || [])
     alert('Alteração salva! (implemente a atualização real)');
   }
 
-function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-  const { name, value } = e.target;
-  setEditingTransaction(prev =>
-    prev
-      ? {
-          ...prev,
-          [name]: name === 'value' ? parseFloat(value) || 0 : value,
-        }
-      : null
-  );
-}
+  function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = e.target;
+    setEditingTransaction(prev =>
+      prev
+        ? {
+            ...prev,
+            [name]: name === 'value' ? parseFloat(value) || 0 : value,
+          }
+        : null
+    );
+  }
+
   if (isLoading) {
     return (
       <Card>
@@ -183,11 +162,7 @@ function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElem
         <h1 className="text-2xl font-bold">Extrato de Movimentações</h1>
       </div>
 
-      {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        {/* Card de Despesas Pagas foi removido porque o componente FluxoDeCaixa não tem mais acesso a todas as despesas, apenas as que já estão combinadas e filtradas. */}
-        {/* <Card className="bg-red-50 border-red-400">...</Card> */}
-
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="bg-green-50 border-green-400">
           <CardHeader>
             <CardTitle className="text-green-800">Total de Receitas</CardTitle>
@@ -220,7 +195,6 @@ function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElem
         </Card>
       </div>
 
-      {/* Seção de Filtros */}
       <Card>
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
@@ -266,7 +240,6 @@ function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElem
         </CardContent>
       </Card>
 
-      {/* Tabela estilo extrato bancário com saldo acumulado */}
       <Card>
         <CardHeader>
           <CardTitle>Histórico de Transações</CardTitle>
@@ -340,7 +313,6 @@ function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElem
         </CardContent>
       </Card>
 
-      {/* Modal de edição */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <CardTitle>Editar Transação</CardTitle>
         {editingTransaction && (
