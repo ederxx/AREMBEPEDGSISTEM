@@ -207,6 +207,7 @@ export function EditExpenseModal({
                 <SelectItem value="Dinheiro">Dinheiro</SelectItem>
                 <SelectItem value="Banco do Brasil">Banco do Brasil</SelectItem>
                 <SelectItem value="Banco Bradesco">Banco Bradesco</SelectItem>
+                <SelectItem value="Cartão de Creidto">Cartão de Credito</SelectItem>
                 <SelectItem value="PIX">PIX</SelectItem>
               </SelectContent>
             </Select>
