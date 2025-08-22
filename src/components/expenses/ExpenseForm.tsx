@@ -132,11 +132,14 @@ funcionario: formData.funcionario || null, // opcional
 if (formData.recorrente) {
   setIsSubmitting(true);
   try {
-    // Lançar uma despesa para cada um dos 12 meses
-    for (let i = 0; i < 12; i++) {
-      const dataVencimentoMes = new Date(formData.dataVencimento!);
-      dataVencimentoMes.setMonth(dataVencimentoMes.getMonth() + i);
+    const dataInicial = new Date(formData.dataVencimento);
+    let dataIteracao = new Date(dataInicial);
 
+    // Define a data limite para o loop: 31 de dezembro de 2025
+    const dataLimite = new Date(2025, 11, 31);
+
+    // Loop até que a data de iteração chegue ao final de 2025
+    while (dataIteracao <= dataLimite) {
       const expenseData = {
         nome: formData.nome,
         valor: parseFloat(formData.valor),
@@ -144,19 +147,23 @@ if (formData.recorrente) {
         subcategoria: formData.subcategoria,
         empresa: formData.empresa,
         formaPagamento: formData.formaPagamento,
-        dataVencimento: format(dataVencimentoMes, 'yyyy-MM-dd'),
+        dataVencimento: format(dataIteracao, 'yyyy-MM-dd'),
         dataPagamento: null,
         funcionario: formData.funcionario || null,
         status: 'pendente', // Força pendente
         recorrente: true,
-        mesReferencia: format(dataVencimentoMes, 'MM/yyyy'),
+        mesReferencia: format(dataIteracao, 'MM/yyyy'),
         userId: user?.uid || '',
         userName: user?.displayName || '',
         createdAt: new Date().toISOString(),
       };
 
       await addExpenseMutation.mutateAsync(expenseData);
+
+      // Avança para o próximo mês
+      dataIteracao.setMonth(dataIteracao.getMonth() + 1);
     }
+    
     toast({ title: 'Despesas recorrentes adicionadas com sucesso!' });
 
     setFormData({
@@ -182,6 +189,7 @@ if (formData.recorrente) {
   }
   return;
 }
+
 
     try {
       await addExpenseMutation.mutateAsync(expenseData);
@@ -413,7 +421,7 @@ console.log('Funcionários disponíveis:', employeeNames);
     checked={formData.recorrente}
     onChange={(e) => setFormData({ ...formData, recorrente: e.target.checked })}
   />
-  <label htmlFor="recorrente" className="text-sm select-none">Despesa Recorrente (12 meses)</label>
+  <label htmlFor="recorrente" className="text-sm select-none">Despesa Recorrente (31/12/2025)</label>
 </div>
 
   {/* Botão */}
