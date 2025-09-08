@@ -244,7 +244,7 @@ const InvoiceGeneration = () => {
           doc.setFillColor(...fillColor);
           doc.rect(margin, yOffset, cellWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
 
-          const dataObj = service.dataInicio ? new Date(service.dataInicio) : null;
+          
 
           const motoristaNomeCompleto = service.motorista || '—';
           const nomeSeparado = motoristaNomeCompleto.split(' ');
@@ -253,9 +253,11 @@ const InvoiceGeneration = () => {
             motoristaFormatado = `${nomeSeparado[0]} ${nomeSeparado[nomeSeparado.length - 1]}`;
           }
           const tipoCarroFormatado = service.tipoCarro ? service.tipoCarro.split(' ')[0] : '—';
-          const rowData = [
-            dataObj ? format(dataObj, "dd/MM/yyyy") : '',
-            dataObj ? format(dataObj, "HH:mm") : '',
+         const dataObj = service.dataInicio ? parseISO(service.dataInicio) : null; // Use parseISO aqui também
+
+const rowData = [
+  dataObj ? format(dataObj, "dd/MM/yyyy") : '',
+  dataObj ? format(dataObj, "HH:mm") : '',
             service.localSaida || '—',
             motoristaFormatado, // Usando o nome formatado
             tipoCarroFormatado,
