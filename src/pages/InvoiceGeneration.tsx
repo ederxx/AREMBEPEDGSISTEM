@@ -253,7 +253,9 @@ const InvoiceGeneration = () => {
             motoristaFormatado = `${nomeSeparado[0]} ${nomeSeparado[nomeSeparado.length - 1]}`;
           }
           const tipoCarroFormatado = service.tipoCarro ? service.tipoCarro.split(' ')[0] : '—';
-         const dataObj = service.dataInicio ? parseISO(service.dataInicio) : null; // Use parseISO aqui também
+      const dataCompleta = `${service.dataInicio}T${service.hrServico}:00`; // ex: "2025-08-22T11:00:00"
+const dataObj = parseISO(dataCompleta);
+
 
 const rowData = [
   dataObj ? format(dataObj, "dd/MM/yyyy") : '',
