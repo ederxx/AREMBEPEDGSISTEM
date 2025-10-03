@@ -380,7 +380,7 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
     const [year, month, day] = dateString.split('-');
     return `${day}/${month}/${year}`;
   };
-
+const [filterMonth, setFilterMonth] = useState<string>(''); 
   if (!user) return null;
  const filteredServices = services
     ? services.filter(service => {
@@ -401,9 +401,19 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
           return false;
         }
 
-        return true;
-      })
-    : [];
+        
+  // ✅ Filtro por mês (formato esperado: 'YYYY-MM')
+      if (filterMonth) {
+        const serviceDate = new Date(service.dataInicio);
+        const serviceMonth = `${serviceDate.getFullYear()}-${String(serviceDate.getMonth() + 1).padStart(2, '0')}`;
+        if (serviceMonth !== filterMonth) {
+          return false;
+        }
+      }
+
+      return true;
+    })
+  : [];
 
   const filteredSortedServices = filteredServices.sort((a, b) => {
     if (!sortField) return 0;
@@ -428,6 +438,8 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
       setSortOrder('asc');
     }
   };
+// Defina o ano base, pode ser dinâmico se quiser
+const currentYear = new Date().getFullYear();
 
 
   return (
@@ -687,9 +699,33 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
                     <SelectItem value="nao_pago">Não Pago</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+                
+             
+   {/* --- NOVO: FILTRO DE MÊS --- */}
+<Select value={filterMonth} onValueChange={(value) => setFilterMonth(value)}>
+  <SelectTrigger className="w-[180px]">
+    <SelectValue placeholder="Filtrar por mês" />
+  </SelectTrigger>
+  <SelectContent>
+<SelectItem value="all">Todos os Meses</SelectItem>
+
+    <SelectItem value={`${currentYear}-01`}>Janeiro</SelectItem>
+    <SelectItem value={`${currentYear}-02`}>Fevereiro</SelectItem>
+    <SelectItem value={`${currentYear}-03`}>Março</SelectItem>
+    <SelectItem value={`${currentYear}-04`}>Abril</SelectItem>
+    <SelectItem value={`${currentYear}-05`}>Maio</SelectItem>
+    <SelectItem value={`${currentYear}-06`}>Junho</SelectItem>
+    <SelectItem value={`${currentYear}-07`}>Julho</SelectItem>
+    <SelectItem value={`${currentYear}-08`}>Agosto</SelectItem>
+    <SelectItem value={`${currentYear}-09`}>Setembro</SelectItem>
+    <SelectItem value={`${currentYear}-10`}>Outubro</SelectItem>
+    <SelectItem value={`${currentYear}-11`}>Novembro</SelectItem>
+    <SelectItem value={`${currentYear}-12`}>Dezembro</SelectItem>
+  </SelectContent>
+</Select>
             </div>
-            {/* --- FIM DA LINHA DOS FILTROS --- */}
+            </div>
+             {/* --- FIM DA LINHA DOS FILTROS --- */}
           </CardHeader>
 
           <CardContent>
