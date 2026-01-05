@@ -9,6 +9,8 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { parseISO } from 'date-fns';
 import BackupDownloader from '../pages/BackupDownloader';
+import { useYear } from '@/contexts/YearContext';
+import { getYearCollection } from '../ultils/getYearCollection';
 
 
 interface Quote {
@@ -62,6 +64,7 @@ interface Expense {
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+const { year, setYear } = useYear();
 
   useEffect(() => {
     if (!user) {
@@ -79,6 +82,8 @@ const Dashboard = () => {
     }
   });
 
+  
+
   const { data: vehicles } = useQuery({
     queryKey: ['vehicles'],
     queryFn: async (): Promise<Vehicle[]> => {
@@ -95,44 +100,36 @@ const Dashboard = () => {
     }
   });
 
-  const { data: services } = useQuery({
-    queryKey: ['services'],
-    queryFn: async (): Promise<Service[]> => {
-      const snapshot = await getDocs(collection(db, 'services'));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-    }
-  });
+ const { data: services } = useQuery({
+  queryKey: ['services', year],
+  queryFn: async () => {
+    const col = getYearCollection('services', year);
+    const snapshot = await getDocs(collection(db, col));
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Service[];
+  },
+});
+
 const formatCurrency = (value: number) =>
     value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   // Aqui a correção importante para o status das despesas:
-  const { data: expenses } = useQuery({
-    queryKey: ['expenses'],
-    queryFn: async (): Promise<Expense[]> => {
-      const snapshot = await getDocs(collection(db, 'expenses'));
-      return snapshot.docs.map(doc => {
-        const data = doc.data();
-        const hoje = new Date();
-        const vencimento = parseISO(data.dataVencimento);
-        const pagamento = data.dataPagamento ? parseISO(data.dataPagamento) : null;
 
-        let status: 'pendente' | 'pago' | 'vencido' = 'pendente';
 
-        if (pagamento && pagamento <= hoje) {
-          status = 'pago';
-        } else if (vencimento < hoje && (!pagamento || (pagamento && pagamento > hoje))) {
-          status = 'vencido';
-        } else {
-          status = 'pendente';
-        }
+const { data: expenses } = useQuery({
+  queryKey: ['expenses', year],
+  queryFn: async () => {
+    const col = getYearCollection('expenses', year);
+    const snapshot = await getDocs(collection(db, col));
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Expense[];
+  },
+});
 
-        return {
-          id: doc.id,
-          ...data,
-          status,
-        } as Expense;
-      });
-    }
-  });
+
 
   const handleLogout = async () => {
     await logout();
@@ -280,6 +277,15 @@ const totalValorFinalizado = (services || [])
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
+      <select
+  value={year}
+  onChange={(e) => setYear(Number(e.target.value))}
+  className="border rounded px-3 py-1 text-sm"
+>
+  <option value={2025}>2025</option>
+  <option value={2026}>2026</option>
+</select>
+
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-teal-primary">Dashboard Administrativo</h1>
