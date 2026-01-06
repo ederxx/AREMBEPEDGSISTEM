@@ -15,11 +15,14 @@ import ExpensesList from '@/components/ExpensesList';
 import ExpenseCharts from '@/components/ExpenseCharts';
 import ExpenseReports from '@/components/expenses/ExpenseReports';
 import { Expense } from '@/types/expense';
+import { useYear } from '@/contexts/YearContext';
+import { getYearCollection } from '../ultils/getYearCollection';
 
 const Expenses = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+  const { year } = useYear();
+
   const [vehiclePlates, setVehiclePlates] = useState<string[]>([]);
   const [employeeNames, setEmployeeNames] = useState<string[]>([]);
 
@@ -116,79 +119,48 @@ const Expenses = () => {
   });
 
   // Buscar despesas
-  const { data: expenses, isLoading } = useQuery({
-    queryKey: ['expenses'],
-    queryFn: async (): Promise<Expense[]> => {
-      if (!user) {
-        console.log('Usuário não autenticado - não buscando despesas');
-        return [];
-      }
-      
-      try {
-        console.log('=== INICIANDO BUSCA DE DESPESAS ===');
-        console.log('Usuário:', user.uid);
-        console.log('Database:', db);
-        
-        const expensesRef = collection(db, 'expenses');
-        console.log('Referência expenses:', expensesRef);
-        console.log('Path da coleção:', expensesRef.path);
-        
-        console.log('Chamando getDocs...');
-        const snapshot = await getDocs(expensesRef);
-        console.log('=== SNAPSHOT RECEBIDO ===');
-        console.log('Tamanho do snapshot:', snapshot.size);
-        console.log('Vazio?', snapshot.empty);
-        console.log('Metadados:', snapshot.metadata);
-        
-        const expenses: Expense[] = [];
-        snapshot.docs.forEach((doc, index) => {
-          console.log(`Documento ${index}:`, doc.id, doc.data());
-          
-          const data = doc.data();
-          const hoje = new Date();
-          const vencimento = new Date(data.dataVencimento);
-          
-          let status: 'pendente' | 'pago' | 'vencido' = 'pendente';
-          if (data.dataPagamento) {
-            status = 'pago';
-          } else if (vencimento < hoje) {
-            status = 'vencido';
-          }
+const { data: expenses, isLoading } = useQuery({
+  queryKey: ['expenses', year],
+  queryFn: async (): Promise<Expense[]> => {
+    if (!user) return [];
 
-          expenses.push({
-            id: doc.id,
-            nome: data.nome,
-            valor: data.valor,
-            categoria: data.categoria,
-            ...data,
-            status,
-            createdAt: data.createdAt || null // Ensure createdAt is present
-          } as Expense);
-        });
-        
-        console.log('=== DESPESAS PROCESSADAS ===');
-        console.log('Total de despesas:', expenses.length);
-        console.log('Despesas:', expenses);
-        
-        return expenses;
-      } catch (error) {
-        console.error('=== ERRO AO BUSCAR DESPESAS ===');
-        console.error('Erro completo:', error);
-        console.error('Tipo do erro:', typeof error);
-        console.error('Código do erro:', error.code);
-        console.error('Mensagem do erro:', error.message);
-        console.error('Stack trace:', error.stack);
-        
-        toast({
-          title: 'Erro ao carregar despesas',
-          description: `Erro: ${error.code} - ${error.message}`,
-          variant: 'destructive'
-        });
-        return [];
-      }
-    },
-    enabled: !!user
-  });
+    try {
+      const collectionName = getYearCollection('expenses', year);
+      const expensesRef = collection(db, collectionName);
+
+      const snapshot = await getDocs(expensesRef);
+
+      const expenses: Expense[] = [];
+      const hoje = new Date();
+
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const vencimento = new Date(data.dataVencimento);
+
+        let status: 'pendente' | 'pago' | 'vencido' = 'pendente';
+        if (data.dataPagamento) status = 'pago';
+        else if (vencimento < hoje) status = 'vencido';
+
+        expenses.push({
+          id: doc.id,
+          ...data,
+          status,
+          createdAt: data.createdAt || null,
+        } as Expense);
+      });
+
+      return expenses;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao carregar despesas',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return [];
+    }
+  },
+  enabled: !!user,
+});
 
   if (!user) return null;
 

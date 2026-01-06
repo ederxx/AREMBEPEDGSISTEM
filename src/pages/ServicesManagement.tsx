@@ -29,12 +29,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useYear } from '@/contexts/YearContext';
+import { getYearCollection } from '../ultils/getYearCollection';
+
+
 
 const ServicesManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { year } = useYear();
+
 const handleExportExcel = () => {
     // Mapeia os dados filtrados e ordenados para o formato do Excel
     const dataToExport = filteredSortedServices.map(service => ({
@@ -146,33 +152,35 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
     }
   };
 
-  const { data: services, isLoading } = useQuery({
-    queryKey: ['services'],
-    queryFn: async () => {
-      const snapshot = await getDocs(collection(db, 'services'));
-      return snapshot.docs
-        .map(docSnap => {
-          const data = docSnap.data();
-          return {
-            id: docSnap.id,
-            nomeEmpresa: data.nomeEmpresa || '',
-            dataInicio: data.dataInicio || '',
-            dataFim: data.dataFim || '',
-            tipoCarro: data.tipoCarro || '',
-            motorista: data.motorista || '',
-            numeroPassageiros: data.numeroPassageiros || '',
-            localSaida: data.localSaida || '',
-            localDestino: data.localDestino || '',
-            hrServico: data.hrServico || '',
-            valorFinal: data.valorFinal || 0,
-            status: data.status || 'pendente',
-            formadePagamento: data.formadePagamento || '',
-            observacoes: data.observacoes || '',
-            // Inclua outros campos necessários aqui
-          };
-        });
-    }
-  });
+const { data: services, isLoading } = useQuery({
+  queryKey: ['services', year],
+  queryFn: async () => {
+    const collectionName = getYearCollection('services', year);
+    const snapshot = await getDocs(collection(db, collectionName));
+
+    return snapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        nomeEmpresa: data.nomeEmpresa || '',
+        dataInicio: data.dataInicio || '',
+        dataFim: data.dataFim || '',
+        tipoCarro: data.tipoCarro || '',
+        motorista: data.motorista || '',
+        numeroPassageiros: data.numeroPassageiros || '',
+        localSaida: data.localSaida || '',
+        localDestino: data.localDestino || '',
+        hrServico: data.hrServico || '',
+        valorFinal: data.valorFinal || 0,
+        status: data.status || 'pendente',
+        formadePagamento: data.formadePagamento || '',
+        observacoes: data.observacoes || '',
+      };
+    });
+  },
+  enabled: !!user,
+});
+
 
   const { data: vehicles } = useQuery({
     queryKey: ['vehicles'],
@@ -184,12 +192,16 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
 
   const addServiceMutation = useMutation({
     mutationFn: async (data: any) => {
-      await addDoc(collection(db, 'services'), {
-        ...data,
-        numeroPassageiros: parseInt(data.numeroPassageiros),
-        valorFinal: parseFloat(data.valorFinal),
-        createdAt: new Date().toISOString()
-      });
+    await addDoc(
+  collection(db, getYearCollection('services', year)),
+  {
+    ...data,
+    numeroPassageiros: parseInt(data.numeroPassageiros),
+    valorFinal: parseFloat(data.valorFinal),
+    createdAt: new Date().toISOString(),
+  }
+);
+
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -212,12 +224,16 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
 
   const updateServiceMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      await updateDoc(doc(db, 'services', id), {
-        ...data,
-        numeroPassageiros: parseInt(data.numeroPassageiros),
-        valorFinal: parseFloat(data.valorFinal),
-        updatedAt: new Date().toISOString()
-      });
+updateDoc(
+  doc(db, getYearCollection('services', year), id),
+  {
+    ...data,
+    numeroPassageiros: parseInt(data.numeroPassageiros),
+    valorFinal: parseFloat(data.valorFinal),
+    updatedAt: new Date().toISOString(),
+  }
+);
+
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -241,10 +257,12 @@ const [filterEmpresa, setFilterEmpresa] = useState('');
 
   const deleteServiceMutation = useMutation({
     mutationFn: async (id: string) => {
-      await deleteDoc(doc(db, 'services', id));
+deleteDoc(
+  doc(db, getYearCollection('services', year), id)
+);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+queryClient.invalidateQueries({ queryKey: ['services', year] });
       toast({
         title: "Sucesso",
         description: "Serviço excluído com sucesso.",
@@ -439,7 +457,8 @@ const [filterMonth, setFilterMonth] = useState<string>('');
     }
   };
 // Defina o ano base, pode ser dinâmico se quiser
-const currentYear = new Date().getFullYear();
+const currentYear = year;
+
 
 
   return (
