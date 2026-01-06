@@ -56,6 +56,9 @@ import { saveAs } from 'file-saver';
 import { ptBR } from 'date-fns/locale';
 import { getDocs, collection} from 'firebase/firestore';
 import {  query, limit, startAfter,  getFirestore, DocumentSnapshot, orderBy } from 'firebase/firestore';
+import { useYear } from '@/contexts/YearContext';
+import { getYearCollection } from '../ultils/getYearCollection';
+
 
 // atulizando despesas no banco de dados
  const expensesRef = collection(db, 'expenses');
@@ -142,6 +145,7 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
   const { user } = useAuth();
+const { year } = useYear();
 
   const tableRef = useRef(null);
 
@@ -241,60 +245,72 @@ const calculateStatus = (
     fetchUsers();
   }, [expenses]);
 
-  const markAsPaidMutation = useMutation({
-    mutationFn: async ({ id, dataPagamento }: { id: string; dataPagamento: string }) => {
-      const expenseRef = doc(db, 'expenses', id);
-      await updateDoc(expenseRef, { dataPagamento });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast({ title: 'Despesa marcada como paga!' });
-      setEditingExpenseId(null);
-      setPaymentDate(undefined);
-    },
-    onError: () => {
-      toast({ title: 'Erro ao atualizar despesa', variant: 'destructive' });
-    },
-  });
+const markAsPaidMutation = useMutation({
+  mutationFn: async ({ id, dataPagamento }: { id: string; dataPagamento: string }) => {
+    const collectionName = getYearCollection('expenses', year);
+    const expenseRef = doc(db, collectionName, id);
 
-  const deleteExpenseMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await deleteDoc(doc(db, 'expenses', id));
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast({ title: 'Despesa excluída com sucesso!' });
-    },
-    onError: () => {
-      toast({ title: 'Erro ao excluir despesa', variant: 'destructive' });
-    },
-  });
-
-  const editExpenseMutation = useMutation({
-    mutationFn: async (updated: Partial<Expense> & { id: string }) => {
-      const expenseRef = doc(db, 'expenses', updated.id);
-      await updateDoc(expenseRef, updated);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast({ title: 'Despesa atualizada com sucesso!' });
-      setIsEditModalOpen(false);
-      setExpenseToEdit(null);
-    },
-    onError: () => {
-      toast({ title: 'Erro ao atualizar despesa', variant: 'destructive' });
-    },
-  });
-const handleMarkAsPaid = (expenseId: string) => {
-  if (paymentDate) {
-    markAsPaidMutation.mutate({
-      id: expenseId,
-      dataPagamento: paymentDate.toISOString(),
+    await updateDoc(expenseRef, {
+      dataPagamento,
     });
-  } else {
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['expenses', year] });
+    toast({ title: 'Despesa marcada como paga!' });
+    setEditingExpenseId(null);
+    setPaymentDate(undefined);
+  },
+  onError: () => {
+    toast({ title: 'Erro ao atualizar despesa', variant: 'destructive' });
+  },
+});
+
+
+const deleteExpenseMutation = useMutation({
+  mutationFn: async (id: string) => {
+    const collectionName = getYearCollection('expenses', year);
+    await deleteDoc(doc(db, collectionName, id));
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['expenses', year] });
+    toast({ title: 'Despesa excluída com sucesso!' });
+  },
+  onError: () => {
+    toast({ title: 'Erro ao excluir despesa', variant: 'destructive' });
+  },
+});
+
+
+ const editExpenseMutation = useMutation({
+  mutationFn: async (updated: Partial<Expense> & { id: string }) => {
+    const collectionName = getYearCollection('expenses', year);
+    const expenseRef = doc(db, collectionName, updated.id);
+
+    await updateDoc(expenseRef, updated);
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['expenses', year] });
+    toast({ title: 'Despesa atualizada com sucesso!' });
+    setIsEditModalOpen(false);
+    setExpenseToEdit(null);
+  },
+  onError: () => {
+    toast({ title: 'Erro ao atualizar despesa', variant: 'destructive' });
+  },
+});
+
+const handleMarkAsPaid = (expenseId: string) => {
+  if (!paymentDate) {
     toast({ title: 'Selecione a data de pagamento', variant: 'destructive' });
+    return;
   }
+
+  markAsPaidMutation.mutate({
+    id: expenseId,
+    dataPagamento: paymentDate.toISOString(),
+  });
 };
+
 
   const getStatusBadge = (status: string) => {
     switch (status) {
