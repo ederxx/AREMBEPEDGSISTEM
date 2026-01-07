@@ -69,44 +69,9 @@ const toDateSafe = (value: any): Date | null => {
 
 
 // atulizando despesas no banco de dados
- const expensesRef = collection(db, 'expenses');
 const PAGE_SIZE = 50; // Altere conforme necessário
 
-async function atualizarFormaPagamentoPaginado() {
-  let lastDoc: DocumentSnapshot | null = null;
-  let totalAtualizados = 0;
-  let pagina = 1;
 
-  while (true) {
-    const q = lastDoc
-      ? query(expensesRef, orderBy('formaPagamento'), startAfter(lastDoc), limit(PAGE_SIZE))
-      : query(expensesRef, orderBy('formaPagamento'), limit(PAGE_SIZE));
-
-    const snapshot = await getDocs(q);
-
-    if (snapshot.empty) break;
-
-    for (const doc of snapshot.docs) {
-      const data = doc.data();
-      const pagamento = (data.formaPagamento || '').trim().toLowerCase();
-
-      if (pagamento === 'bradesco') {
-        await updateDoc(doc.ref, {
-          formaPagamento: 'Banco Bradesco',
-        });
-        console.log(`✔️ Atualizado: ${doc.id}`);
-        totalAtualizados++;
-      }
-    }
-
-    lastDoc = snapshot.docs[snapshot.docs.length - 1];
-    console.log(`📄 Página ${pagina++} processada.`);
-  }
-
-  console.log(`✅ Total de documentos atualizados: ${totalAtualizados}`);
-} 
-
-atualizarFormaPagamentoPaginado().catch(console.error);
 
 
 interface ExpensesListProps {

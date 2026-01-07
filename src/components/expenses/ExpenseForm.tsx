@@ -17,8 +17,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { EXPENSE_CATEGORIES } from '@/constants/expenseCategories';
 import { ExpenseFormData } from '@/types/expense';
-import { useYear } from '@/contexts/YearContext';
-import { getYearCollection } from '@/ultils/getYearCollection';
+
 
 interface ExpenseFormProps {
   vehiclePlates: string[];
@@ -30,6 +29,7 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
     const { year } = useYear(); // ✅ AQUI
 
   const queryClient = useQueryClient();
+const { year } = useYear();
 
   const [formData, setFormData] = useState<ExpenseFormData>({
     nome: '',
@@ -46,15 +46,46 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-const addExpenseMutation = useMutation({
-  mutationFn: async (expense: any) => {
-    if (!user) throw new Error('Usuário não autenticado');
 
-    const expensesRef = collection(db, getYearCollection('expenses', year));
-    return await addDoc(expensesRef, expense);
-  },
-});
+  const addExpenseMutation = useMutation({
+    mutationFn: async (expense: any) => {
+      if (!user) {
+        throw new Error('Usuário não autenticado');
+      }
 
+      const expensesRef = collection(db, 'expenses');
+      const docRef = await addDoc(expensesRef, expense);
+      return docRef;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast({ title: 'Despesa adicionada com sucesso!' });
+
+      setFormData({
+        nome: '',
+        dataVencimento: undefined, 
+        dataPagamento: undefined,
+        valor: '',
+        categoria: '',
+        subcategoria: '',
+        placa: '',
+        empresa: '',
+        formaPagamento: '',
+        funcionario: '',
+         recorrente: false // reset também aqui
+      });
+
+      setIsSubmitting(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao adicionar despesa',
+        description: `${error.code || ''}: ${error.message || 'Erro inesperado'}`,
+        variant: 'destructive',
+      });
+      setIsSubmitting(false);
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
