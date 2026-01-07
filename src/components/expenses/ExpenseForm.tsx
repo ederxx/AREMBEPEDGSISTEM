@@ -17,7 +17,8 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { EXPENSE_CATEGORIES } from '@/constants/expenseCategories';
 import { ExpenseFormData } from '@/types/expense';
-
+import { useYear } from '@/contexts/YearContext';
+import { getYearCollection } from '@/ultils/getYearCollection';
 
 interface ExpenseFormProps {
   vehiclePlates: string[];
@@ -26,6 +27,8 @@ interface ExpenseFormProps {
 
 const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
   const { user } = useAuth();
+    const { year } = useYear(); // ✅ AQUI
+
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState<ExpenseFormData>({
@@ -43,46 +46,15 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+const addExpenseMutation = useMutation({
+  mutationFn: async (expense: any) => {
+    if (!user) throw new Error('Usuário não autenticado');
 
-  const addExpenseMutation = useMutation({
-    mutationFn: async (expense: any) => {
-      if (!user) {
-        throw new Error('Usuário não autenticado');
-      }
+    const expensesRef = collection(db, getYearCollection('expenses', year));
+    return await addDoc(expensesRef, expense);
+  },
+});
 
-      const expensesRef = collection(db, 'expenses');
-      const docRef = await addDoc(expensesRef, expense);
-      return docRef;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast({ title: 'Despesa adicionada com sucesso!' });
-
-      setFormData({
-        nome: '',
-        dataVencimento: undefined, 
-        dataPagamento: undefined,
-        valor: '',
-        categoria: '',
-        subcategoria: '',
-        placa: '',
-        empresa: '',
-        formaPagamento: '',
-        funcionario: '',
-         recorrente: false // reset também aqui
-      });
-
-      setIsSubmitting(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Erro ao adicionar despesa',
-        description: `${error.code || ''}: ${error.message || 'Erro inesperado'}`,
-        variant: 'destructive',
-      });
-      setIsSubmitting(false);
-    },
-  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,56 +86,61 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
   finalName = `${formData.funcionario} - ${formData.nome}`;
 }
 
-   const expenseData = {
-  nome: formData.nome,
+const expenseData = {
+  nome: finalName,
   valor: parseFloat(formData.valor),
   categoria: formData.categoria,
   subcategoria: formData.subcategoria,
   empresa: formData.empresa,
   formaPagamento: formData.formaPagamento,
-  dataVencimento: formData.dataVencimento ? format(formData.dataVencimento, 'yyyy-MM-dd') : undefined,
-dataPagamento: formData.dataPagamento ? format(formData.dataPagamento, 'yyyy-MM-dd') : null,
-funcionario: formData.funcionario || null, // opcional
-  userId: user?.uid || '',           // salva o uid do usuário
-  userName: user?.displayName || '', // salva o nome do usuário
 
+  dataVencimento: formData.dataVencimento.toISOString(),
+  dataPagamento: formData.dataPagamento
+    ? formData.dataPagamento.toISOString()
+    : null,
+
+  funcionario: formData.funcionario || null,
+  recorrente: false,
+  status: 'pendente',
+
+  userId: user?.uid || '',
+  userName: user?.displayName || '',
   createdAt: new Date().toISOString(),
 };
+
 if (formData.recorrente) {
   setIsSubmitting(true);
   try {
-    const dataInicial = new Date(formData.dataVencimento);
-    let dataIteracao = new Date(dataInicial);
+const dataInicial = new Date(formData.dataVencimento);
+const dataLimite = new Date(dataInicial);
+dataLimite.setFullYear(dataLimite.getFullYear() + 1); // +1 ano
 
-    // Define a data limite para o loop: 31 de dezembro de 2025
-    const dataLimite = new Date(2025, 11, 31);
 
-    // Loop até que a data de iteração chegue ao final de 2025
-    while (dataIteracao <= dataLimite) {
-      const expenseData = {
-        nome: formData.nome,
-        valor: parseFloat(formData.valor),
-        categoria: formData.categoria,
-        subcategoria: formData.subcategoria,
-        empresa: formData.empresa,
-        formaPagamento: formData.formaPagamento,
-        dataVencimento: format(dataIteracao, 'yyyy-MM-dd'),
-        dataPagamento: null,
-        funcionario: formData.funcionario || null,
-        status: 'pendente', // Força pendente
-        recorrente: true,
-        mesReferencia: format(dataIteracao, 'MM/yyyy'),
-        userId: user?.uid || '',
-        userName: user?.displayName || '',
-        createdAt: new Date().toISOString(),
-      };
+for (let i = 0; i < 12; i++) {
+  const dataIteracao = new Date(dataInicial);
+  dataIteracao.setMonth(dataInicial.getMonth() + i);
 
-      await addExpenseMutation.mutateAsync(expenseData);
+  const expenseData = {
+    nome: formData.nome,
+    valor: parseFloat(formData.valor),
+    categoria: formData.categoria,
+    subcategoria: formData.subcategoria,
+    empresa: formData.empresa,
+    formaPagamento: formData.formaPagamento,
+    dataVencimento: format(dataIteracao, 'yyyy-MM-dd'),
+    dataPagamento: null,
+    funcionario: formData.funcionario || null,
+    status: 'pendente',
+    recorrente: true,
+    mesReferencia: format(dataIteracao, 'MM/yyyy'),
+    userId: user?.uid || '',
+    userName: user?.displayName || '',
+    createdAt: new Date().toISOString(),
+  };
 
-      // Avança para o próximo mês
-      dataIteracao.setMonth(dataIteracao.getMonth() + 1);
-    }
-    
+  await addExpenseMutation.mutateAsync(expenseData);
+}
+
     toast({ title: 'Despesas recorrentes adicionadas com sucesso!' });
 
     setFormData({

@@ -58,6 +58,14 @@ import { getDocs, collection} from 'firebase/firestore';
 import {  query, limit, startAfter,  getFirestore, DocumentSnapshot, orderBy } from 'firebase/firestore';
 import { useYear } from '@/contexts/YearContext';
 import { getYearCollection } from '../ultils/getYearCollection';
+import { Timestamp } from 'firebase/firestore';
+
+const toDateSafe = (value: any): Date | null => {
+  if (!value) return null;
+  if (value instanceof Timestamp) return value.toDate();
+  if (typeof value === 'string') return new Date(value);
+  return null;
+};
 
 
 // atulizando despesas no banco de dados
@@ -190,27 +198,20 @@ const calculateStatus = (
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
-  const vencimento = new Date(expense.dataVencimento);
+  const vencimento = toDateSafe(expense.dataVencimento);
+  const pagamento = toDateSafe(expense.dataPagamento);
+
+  if (!vencimento) return 'pendente';
+
   vencimento.setHours(0, 0, 0, 0);
 
-  // Só considera pagamento se for uma data válida
-  const pagamento =
-    expense.dataPagamento && !isNaN(new Date(expense.dataPagamento).getTime())
-      ? new Date(expense.dataPagamento)
-      : null;
-
-  // Se tem data de pagamento válida
   if (pagamento) {
     pagamento.setHours(0, 0, 0, 0);
     if (pagamento <= hoje) return 'pago';
     if (pagamento > hoje) return 'programado';
   }
 
-  // Se NÃO tem pagamento
-  if (!pagamento) {
-    if (vencimento < hoje) return 'vencido'; // venceu e não pagou
-    return 'pendente'; // ainda vai vencer e não pagou
-  }
+  if (vencimento < hoje) return 'vencido';
 
   return 'pendente';
 };
