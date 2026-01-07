@@ -26,5 +26,6 @@ export interface ExpenseFormData {
   formaPagamento: string;
     funcionario: string;
     recorrente: boolean; // adiciona aqui para tipar bem a empresa
+    quantidadeParcelas: number;
 // placa do veículo ou nome do funcionário
 }

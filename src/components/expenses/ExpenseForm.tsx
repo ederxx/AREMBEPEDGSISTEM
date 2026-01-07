@@ -43,6 +43,8 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
     formaPagamento: '', 
       funcionario: '',
       recorrente: false,// ✅ novo campo
+        quantidadeParcelas: 12, // ✅ padrão
+
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,6 +73,11 @@ const addExpenseMutation = useMutation({
       !formData.formaPagamento // validação nova
     ) {
       toast({ title: 'Preencha todos os campos obrigatórios', variant: 'destructive' });
+      return;
+    }
+
+    if (formData.recorrente && (!formData.quantidadeParcelas || formData.quantidadeParcelas < 1)) {
+      toast({ title: 'Insira o número de parcelas (mínimo 1)', variant: 'destructive' });
       return;
     }
 
@@ -111,8 +118,9 @@ const expenseData = {
 if (formData.recorrente) {
   try {
     const dataInicial = new Date(formData.dataVencimento);
+    const parcelas = formData.quantidadeParcelas && formData.quantidadeParcelas > 0 ? formData.quantidadeParcelas : 1;
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < parcelas; i++) {
       const dataIteracao = new Date(dataInicial);
       dataIteracao.setMonth(dataInicial.getMonth() + i);
 
@@ -153,6 +161,7 @@ if (formData.recorrente) {
       formaPagamento: '',
       funcionario: '',
       recorrente: false,
+      quantidadeParcelas: 12,
     });
   } catch (error) {
     toast({
@@ -304,7 +313,8 @@ console.log('Funcionários disponíveis:', employeeNames);
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="Bradesco">Banco Bradesco</SelectItem>
-          <SelectItem value="Brasil">Banco do Brasil</SelectItem>
+          <SelectItem value="Brasil">Banco do Brasil</SelectItem>    
+          <SelectItem value="Caixa Econômica">Caixa Econômica</SelectItem>           
           <SelectItem value="Cartão de Credito">Cartão de Credito</SelectItem>
           <SelectItem value="À Vista">À Vista</SelectItem>
         </SelectContent>
@@ -392,14 +402,38 @@ console.log('Funcionários disponíveis:', employeeNames);
     </div>
   </div>
   <div className="flex items-center space-x-2">
-  <input
-    type="checkbox"
-    id="recorrente"
-    checked={formData.recorrente}
-    onChange={(e) => setFormData({ ...formData, recorrente: e.target.checked })}
-  />
-  <label htmlFor="recorrente" className="text-sm select-none">Despesa Recorrente (31/12/2025)</label>
-</div>
+    <input
+      type="checkbox"
+      id="recorrente"
+      checked={formData.recorrente}
+      onChange={(e) =>
+        setFormData({
+          ...formData,
+          recorrente: e.target.checked,
+        })
+      }
+    />
+    <label htmlFor="recorrente" className="text-sm select-none">Despesa Recorrente</label>
+
+    <div className="ml-4 flex items-center space-x-2">
+      <Label className="mb-0">Parcelas</Label>
+      <Input
+        type="number"
+        min={1}
+        value={formData.quantidadeParcelas}
+        onChange={(e) =>
+          setFormData({
+            ...formData,
+            quantidadeParcelas: Number(e.target.value) || 1,
+          })
+        }
+        placeholder="12"
+        className={cn('w-24', !formData.recorrente && 'opacity-50')}
+        disabled={!formData.recorrente}
+      />
+    </div>
+  </div>
+
 
   {/* Botão */}
   <Button type="submit" className="w-full" disabled={isSubmitting}>
