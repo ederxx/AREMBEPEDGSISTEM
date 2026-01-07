@@ -109,37 +109,35 @@ const expenseData = {
 };
 
 if (formData.recorrente) {
-  setIsSubmitting(true);
   try {
-const dataInicial = new Date(formData.dataVencimento);
-const dataLimite = new Date(dataInicial);
-dataLimite.setFullYear(dataLimite.getFullYear() + 1); // +1 ano
+    const dataInicial = new Date(formData.dataVencimento);
 
+    for (let i = 0; i < 12; i++) {
+      const dataIteracao = new Date(dataInicial);
+      dataIteracao.setMonth(dataInicial.getMonth() + i);
 
-for (let i = 0; i < 12; i++) {
-  const dataIteracao = new Date(dataInicial);
-  dataIteracao.setMonth(dataInicial.getMonth() + i);
+      await addExpenseMutation.mutateAsync({
+        nome: finalName, // ✅ nome correto
+        valor: parseFloat(formData.valor),
+        categoria: formData.categoria,
+        subcategoria: formData.subcategoria,
+        empresa: formData.empresa,
+        formaPagamento: formData.formaPagamento,
 
-  const expenseData = {
-    nome: formData.nome,
-    valor: parseFloat(formData.valor),
-    categoria: formData.categoria,
-    subcategoria: formData.subcategoria,
-    empresa: formData.empresa,
-    formaPagamento: formData.formaPagamento,
-    dataVencimento: format(dataIteracao, 'yyyy-MM-dd'),
-    dataPagamento: null,
-    funcionario: formData.funcionario || null,
-    status: 'pendente',
-    recorrente: true,
-    mesReferencia: format(dataIteracao, 'MM/yyyy'),
-    userId: user?.uid || '',
-    userName: user?.displayName || '',
-    createdAt: new Date().toISOString(),
-  };
+        // ✅ PADRÃO CORRETO (ISO)
+        dataVencimento: dataIteracao.toISOString(),
+        dataPagamento: null,
 
-  await addExpenseMutation.mutateAsync(expenseData);
-}
+        funcionario: formData.funcionario || null,
+        recorrente: true,
+        mesReferencia: format(dataIteracao, 'MM/yyyy'),
+
+        status: 'pendente',
+        userId: user?.uid || '',
+        userName: user?.displayName || '',
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     toast({ title: 'Despesas recorrentes adicionadas com sucesso!' });
 
@@ -164,8 +162,10 @@ for (let i = 0; i < 12; i++) {
   } finally {
     setIsSubmitting(false);
   }
-  return;
+
+  return; // ✅ impede cair no cadastro simples
 }
+
 
 
     try {

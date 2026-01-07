@@ -119,6 +119,7 @@ const ExpensesList = ({ expenses, isLoading }: ExpensesListProps) => {
   const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
   const { user } = useAuth();
 const { year } = useYear();
+const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const tableRef = useRef(null);
 
