@@ -1,38 +1,38 @@
-import { useQuery } from '@tanstack/react-query';
-import { collection, getDocs, query, where } from 'firebase/firestore'; // Importe 'query' e 'where'
-import { db } from '@/config/firebase';
-import FluxoDeCaixa from './FluxoCaixa';
-import { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { format, parseISO, isBefore, isAfter } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 
-// Interfaces e tipos (mantidos por clareza)
-interface Expense {
-  id: string;
-  nome: string;
-  dataVencimento: string;
-  valor: number;
-  categoria: string;
-  dataPagamento?: string;
-  empresa: string;
-  // Adicione outros campos necessários aqui
-}
-
-interface Service {
-  id: string;
-  date?: string;
-  dataInicio?: string;
-  nomeEmpresa?: string;
-  tipoCarro?: string;
-  localDestino?: string;
-  valorFinal?: number;
-  status?: string;
-  formadePagamento?: string;
-  [key: string]: unknown;
-}
-
-interface Transaction {
+/* =========================
+   TIPOS
+========================= */
+export interface Transaction {
   id: string;
   date: string;
-  dateVencimento?: string;
   type: 'receita' | 'despesa';
   description: string;
   value: number;
@@ -43,91 +43,193 @@ interface Transaction {
   formadePagamento?: string;
 }
 
-const calculateStatus = (expense: Expense) => {
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+interface Props {
+  transactions: Transaction[];
+  isLoading: boolean;
+}
 
-  const pagamento = expense.dataPagamento ? new Date(expense.dataPagamento) : null;
-  const vencimento = expense.dataVencimento ? new Date(expense.dataVencimento) : null;
+/* =========================
+   COMPONENTE
+========================= */
+const FluxoDeCaixa = ({ transactions, isLoading }: Props) => {
+  const navigate = useNavigate();
 
-  if (pagamento) {
-    if (pagamento <= hoje) return 'pago';
-    return 'programado';
+  const [filterYear, setFilterYear] = useState<'all' | string>('all');
+  const [filterType, setFilterType] =
+    useState<'all' | 'receita' | 'despesa'>('all');
+  const [filterEmpresa, setFilterEmpresa] =
+    useState<'all' | 'Arembepe' | 'DG'>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  /* =========================
+     ANOS DISPONÍVEIS
+  ========================= */
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+
+    transactions.forEach(t => {
+      if (t.date) {
+        years.add(parseISO(t.date).getFullYear().toString());
+      }
+    });
+
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [transactions]);
+
+  /* =========================
+     FILTRO CORRIGIDO
+  ========================= */
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      if (!t.date) return false;
+
+      const dateObj = parseISO(t.date);
+      if (isNaN(dateObj.getTime())) return false;
+
+      // ✅ FILTRO DE ANO (CORRIGIDO)
+      if (filterYear !== 'all') {
+        const year = dateObj.getFullYear().toString();
+        if (year !== filterYear) return false;
+      }
+
+      // 🔥 regra: receita faturada não entra
+      if (t.type === 'receita' && t.formadePagamento === 'faturado') {
+        return false;
+      }
+
+      if (filterType !== 'all' && t.type !== filterType) return false;
+
+      if (
+        filterEmpresa !== 'all' &&
+        t.empresa?.toLowerCase() !== filterEmpresa.toLowerCase()
+      ) {
+        return false;
+      }
+
+      if (startDate && isBefore(dateObj, parseISO(startDate))) return false;
+      if (endDate && isAfter(dateObj, parseISO(endDate))) return false;
+
+      return true;
+    });
+  }, [transactions, filterYear, filterType, filterEmpresa, startDate, endDate]);
+
+  /* =========================
+     SALDO ACUMULADO
+  ========================= */
+  const transacoesComSaldo = useMemo(() => {
+    let saldo = 0;
+    return filteredTransactions.map(t => {
+      saldo += t.type === 'receita' ? t.value : -t.value;
+      return { ...t, saldoAcumulado: saldo };
+    });
+  }, [filteredTransactions]);
+
+  const totalReceita = filteredTransactions
+    .filter(t => t.type === 'receita')
+    .reduce((sum, t) => sum + t.value, 0);
+
+  const totalDespesa = filteredTransactions
+    .filter(t => t.type === 'despesa')
+    .reduce((sum, t) => sum + t.value, 0);
+
+  const saldoFinal = totalReceita - totalDespesa;
+
+  if (isLoading) {
+    return <div className="p-6">Carregando...</div>;
   }
-
-  if (vencimento) {
-    if (vencimento < hoje) return 'vencido';
-  }
-
-  return 'pendente';
-};
-
-const FluxoDeCaixaPage = () => {
-  // ... (o seu código do user e navigate)
-
-  const { data: expenses = [], isLoading: isLoadingExpenses } = useQuery<Expense[]>({
-    queryKey: ['expenses'],
-    queryFn: async () => {
-      const snapshot = await getDocs(collection(db, 'expenses'));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as Expense }));
-    },
-  });
-
-  // **ALTERAÇÃO AQUI:** Usando 'where' para filtrar no Firestore
-  const { data: services = [], isLoading: isLoadingServices } = useQuery<Service[]>({
-    queryKey: ['services-for-incomes'],
-    queryFn: async () => {
-      // Cria a consulta filtrada: só busca serviços com 'formadePagamento' igual a 'pago'
-      const q = query(collection(db, 'services'), where('formadePagamento', '==', 'pago'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as Service }));
-    },
-  });
-
-  const isLoading = isLoadingExpenses || isLoadingServices;
-
-  // Lógica para combinar e ordenar transações agora centralizada aqui
-  const transactions = useMemo(() => {
-    // Filtra as despesas com status 'pago' usando a função 'calculateStatus'
-    const relevantExpenses = expenses.filter(exp => calculateStatus(exp) === 'pago');
-    
-    // A lista de serviços já vem filtrada do banco de dados, então não precisa de filtro extra aqui
-    const combined: Transaction[] = [
-      ...relevantExpenses.map(exp => ({
-        id: exp.id,
-        date: exp.dataVencimento,
-        type: 'despesa' as const,
-        description: exp.nome,
-        value: exp.valor,
-        status: calculateStatus(exp),
-        empresa: exp.empresa,
-        nome: exp.nome,
-      })),
-      ...services.map(serv => ({
-        id: serv.id,
-        date: serv.dataInicio ?? '',
-        type: 'receita' as const,
-        description: String(serv.nomeEmpresa ?? ''),
-        value: Number(serv.valorFinal ?? 0),
-        nome: String(serv.nomeEmpresa ?? ''),
-        status: String(serv.status ?? 'pendente'),
-        formadePagamento: serv.formadePagamento, // Mantendo a propriedade
-      })),
-    ];
-
-    combined.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    return combined;
-  }, [expenses, services]);
-
 
   return (
-    <div className="flex-1 flex-col p-4 md:p-8">
-      <FluxoDeCaixa
-        transactions={transactions}
-        isLoading={isLoading}
-      />
+    <div className="space-y-6">
+      <Button variant="outline" onClick={() => navigate('/dashboard')}>
+        Voltar
+      </Button>
+
+      {/* RESUMO */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="bg-green-50">
+          <CardHeader>
+            <CardTitle>Receitas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            R$ {totalReceita.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-red-50">
+          <CardHeader>
+            <CardTitle>Despesas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            R$ {totalDespesa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Saldo</CardTitle>
+          </CardHeader>
+          <CardContent
+            className={saldoFinal >= 0 ? 'text-green-600' : 'text-red-600'}
+          >
+            R$ {saldoFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* FILTROS */}
+      <Card>
+        <CardContent className="grid grid-cols-4 gap-4">
+          <div>
+            <Label>Ano</Label>
+            <Select value={filterYear} onValueChange={setFilterYear}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {availableYears.map(y => (
+                  <SelectItem key={y} value={y}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* TABELA */}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Data</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Descrição</TableHead>
+            <TableHead className="text-right">Valor</TableHead>
+            <TableHead className="text-right">Saldo</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {transacoesComSaldo.map(t => (
+            <TableRow key={t.id}>
+              <TableCell>
+                {format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR })}
+              </TableCell>
+              <TableCell>{t.type}</TableCell>
+              <TableCell>{t.description}</TableCell>
+              <TableCell className="text-right">
+                R$ {t.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </TableCell>
+              <TableCell className="text-right">
+                R$ {t.saldoAcumulado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 };
 
-export default FluxoDeCaixaPage;
+export default FluxoDeCaixa;
