@@ -16,13 +16,16 @@ import jsPDF from "jspdf";
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import logoAre from '../imagens/are.jpg';
 import logoDg from '../imagens/dg.jpg';
+import { useYear } from '@/contexts/YearContext';
+import { getYearCollection } from '@/ultils/getYearCollection';
+
 
 // Componente principal para a geração de faturas.
 const InvoiceGeneration = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-
+  const { year } = useYear();
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [bankData, setBankData] = useState({
     banco: '',
@@ -42,16 +45,26 @@ const InvoiceGeneration = () => {
   }, [user, navigate]);
 
   // Busca os serviços "faturados" do Firestore.
-  const { data: services, isLoading } = useQuery({
-    queryKey: ['unbilled-services'],
-    queryFn: async () => {
-      const snapshot = await getDocs(collection(db, 'services'));
-      return snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() as any }))
-        .filter(service => service.formadePagamento === 'faturado');
-    },
-    enabled: !!user
-  });
+ const { data: services, isLoading } = useQuery({
+  queryKey: ['services', year],
+  queryFn: async () => {
+    if (!user) return [];
+
+    const collectionName = getYearCollection('services', year);
+    const servicesRef = collection(db, collectionName);
+
+    const snapshot = await getDocs(servicesRef);
+
+    return snapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }) as any)
+      .filter(service => service.formadePagamento === 'faturado');
+  },
+  enabled: !!user && !!year,
+});
+
 
   // Filtra os serviços com base nos critérios de empresa e datas.
   const filteredServices = services?.filter(service => {

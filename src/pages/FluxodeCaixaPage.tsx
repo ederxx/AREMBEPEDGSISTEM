@@ -47,11 +47,14 @@ interface Props {
   transactions: Transaction[];
   isLoading: boolean;
 }
-
+interface FluxoDeCaixaProps {
+  transactions?: Transaction[];
+  isLoading: boolean;
+}
 /* =========================
    COMPONENTE
 ========================= */
-const FluxoDeCaixa = ({ transactions, isLoading }: Props) => {
+const FluxoDeCaixa = ({ transactions = [], isLoading }: FluxoDeCaixaProps) => {
   const navigate = useNavigate();
 
   const [filterYear, setFilterYear] = useState<'all' | string>('all');
@@ -68,7 +71,8 @@ const FluxoDeCaixa = ({ transactions, isLoading }: Props) => {
   const availableYears = useMemo(() => {
     const years = new Set<string>();
 
-    transactions.forEach(t => {
+(transactions || []).forEach(t => {
+
       if (t.date) {
         years.add(parseISO(t.date).getFullYear().toString());
       }
@@ -138,7 +142,15 @@ const FluxoDeCaixa = ({ transactions, isLoading }: Props) => {
   if (isLoading) {
     return <div className="p-6">Carregando...</div>;
   }
-
+if (isLoading || !transactions) {
+  return (
+    <Card>
+      <CardContent className="p-6 text-center">
+        Carregando dados...
+      </CardContent>
+    </Card>
+  );
+}
   return (
     <div className="space-y-6">
       <Button variant="outline" onClick={() => navigate('/dashboard')}>
