@@ -51,11 +51,14 @@ const ExpenseForm = ({ vehiclePlates, employeeNames }: ExpenseFormProps) => {
 const addExpenseMutation = useMutation({
   mutationFn: async (expense: any) => {
     if (!user) throw new Error('Usuário não autenticado');
-
     const expensesRef = collection(db, getYearCollection('expenses', year));
     return await addDoc(expensesRef, expense);
   },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['expenses', year] });
+  },
 });
+
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -176,13 +179,36 @@ if (formData.recorrente) {
 }
 
 
+try {
+  await addExpenseMutation.mutateAsync(expenseData);
 
-    try {
-      await addExpenseMutation.mutateAsync(expenseData);
-    } catch (error) {
-      setIsSubmitting(false);
-    }
+  toast({ title: 'Despesa adicionada com sucesso!' });
+
+  setFormData({
+    nome: '',
+    dataVencimento: undefined,
+    dataPagamento: undefined,
+    valor: '',
+    categoria: '',
+    subcategoria: '',
+    placa: '',
+    empresa: '',
+    formaPagamento: '',
+    funcionario: '',
+    recorrente: false,
+    quantidadeParcelas: 12,
+  });
+} catch (error) {
+  toast({
+    title: 'Erro ao adicionar despesa',
+    variant: 'destructive',
+  });
+} finally {
+  setIsSubmitting(false);
+}
+
   };
+const queryClient = useQueryClient();
 
   const getSubcategories = () => {
     if (!formData.categoria) return [];
