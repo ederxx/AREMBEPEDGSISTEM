@@ -73,7 +73,7 @@ const FluxoDeCaixaMaster = () => {
         list.push({
           id: s.id,
           date: s.dataInicio, // Usando data de início como referência
-          description: s.nomeEmpresa,
+          description: s.localSaida || s.nomeEmpresa || 'Sem local de saída',
           value: Number(s.valorFinal) || 0,
           type: 'receita',
           category: s.tipoCarro || 'Serviço',
