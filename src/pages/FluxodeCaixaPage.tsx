@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
@@ -12,6 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, TrendingDown, DollarSign, ArrowLeft } from 'lucide-react';
 
@@ -32,6 +34,12 @@ const FluxoDeCaixaMaster = () => {
   const { user } = useAuth();
   const { year } = useYear();
   const navigate = useNavigate();
+
+  const [typeFilter, setTypeFilter] = useState<'all' | 'receita' | 'despesa'>('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [searchText, setSearchText] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // 1. Buscar Receitas (Services)
   const { data: services = [], isLoading: loadingServices } = useQuery({
@@ -80,7 +88,7 @@ const FluxoDeCaixaMaster = () => {
         list.push({
           id: e.id,
           date: e.dataPagamento, // Data real que saiu o dinheiro
-          description: e.descricao || e.subcategoria,
+          description: e.descricao || 'Sem descrição',
           value: Number(e.valor) || 0,
           type: 'despesa',
           category: e.categoria || 'Geral',
@@ -102,6 +110,26 @@ const FluxoDeCaixaMaster = () => {
       saldoFinal: receitas - despesas
     };
   }, [services, expenses]);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    transactions.forEach(t => set.add(t.category));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [transactions]);
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      if (typeFilter !== 'all' && t.type !== typeFilter) return false;
+      if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+      if (searchText) {
+        const hay = `${t.description} ${t.category}`.toLowerCase();
+        if (!hay.includes(searchText.toLowerCase())) return false;
+      }
+      if (startDate && new Date(t.date) < new Date(startDate)) return false;
+      if (endDate && new Date(t.date) > new Date(endDate)) return false;
+      return true;
+    });
+  }, [transactions, typeFilter, categoryFilter, searchText, startDate, endDate]);
 
   if (loadingServices || loadingExpenses) {
     return <div className="p-8 text-center">Carregando Fluxo de Caixa...</div>;
@@ -158,6 +186,66 @@ const FluxoDeCaixaMaster = () => {
         </Card>
       </div>
 
+      {/* FILTROS */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-5">
+            <div className="space-y-2">
+              <span className="text-sm text-muted-foreground">Tipo</span>
+              <Select value={typeFilter} onValueChange={(v: 'all' | 'receita' | 'despesa') => setTypeFilter(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="receita">Receitas</SelectItem>
+                  <SelectItem value="despesa">Despesas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-sm text-muted-foreground">Categoria</span>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-sm text-muted-foreground">Busca</span>
+              <Input
+                placeholder="Empresa ou despesa"
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-sm text-muted-foreground">Data inicial</span>
+              <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-sm text-muted-foreground">Data final</span>
+              <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* TABELA DE MOVIMENTAÇÃO */}
       <Card>
         <CardHeader>
@@ -174,10 +262,21 @@ const FluxoDeCaixaMaster = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.map((t) => (
-                <TableRow key={t.id}>
+              {filteredTransactions.map((t) => (
+                <TableRow
+                  key={t.id}
+                  className={t.type === 'receita' ? 'bg-green-50/60' : 'bg-red-50/60'}
+                >
                   <TableCell>
-                    <span>{t.description}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{t.description}</span>
+                      <Badge
+                        variant="outline"
+                        className={`w-fit text-[10px] uppercase ${t.type === 'receita' ? 'text-green-700 border-green-300' : 'text-red-700 border-red-300'}`}
+                      >
+                        {t.type}
+                      </Badge>
+                    </div>
                   </TableCell>
                   <TableCell className="font-medium">
                     {format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR })}
@@ -188,7 +287,7 @@ const FluxoDeCaixaMaster = () => {
                   </TableCell>
                 </TableRow>
               ))}
-              {transactions.length === 0 && (
+              {filteredTransactions.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
                     Nenhuma movimentação financeira encontrada para este período.
