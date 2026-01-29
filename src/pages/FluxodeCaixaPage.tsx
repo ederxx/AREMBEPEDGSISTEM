@@ -167,8 +167,8 @@ const FluxoDeCaixaMaster = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Despesa</TableHead>
                 <TableHead>Data</TableHead>
-                <TableHead>Descrição</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
               </TableRow>
@@ -176,9 +176,6 @@ const FluxoDeCaixaMaster = () => {
             <TableBody>
               {transactions.map((t) => (
                 <TableRow key={t.id}>
-                  <TableCell className="font-medium">
-                    {format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR })}
-                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                       <span>{t.description}</span>
@@ -186,6 +183,9 @@ const FluxoDeCaixaMaster = () => {
                         {t.type}
                       </Badge>
                     </div>
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR })}
                   </TableCell>
                   <TableCell>{t.category}</TableCell>
                   <TableCell className={`text-right font-bold ${t.type === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
