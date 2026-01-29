@@ -266,15 +266,27 @@ const InvoiceGeneration = () => {
             motoristaFormatado = `${nomeSeparado[0]} ${nomeSeparado[nomeSeparado.length - 1]}`;
           }
           const tipoCarroFormatado = service.tipoCarro ? service.tipoCarro.split(' ')[0] : '—';
-      const dataCompleta = `${service.dataInicio}T${service.hrServico}:00`; // ex: "2025-08-22T11:00:00"
-const dataObj = parseISO(dataCompleta);
+          
+          // Formata a data e hora do serviço
+          let dataObj = null;
+          try {
+            const hrServico = service.hrServico || '00:00';
+            const dataCompleta = `${service.dataInicio}T${hrServico}:00`;
+            dataObj = parseISO(dataCompleta);
+          } catch {
+            // Se falhar, tenta apenas com a data
+            try {
+              dataObj = parseISO(service.dataInicio);
+            } catch {
+              // Se ainda falhar, deixa null
+            }
+          }
 
-
-const rowData = [
-  dataObj ? format(dataObj, "dd/MM/yyyy") : '',
-  dataObj ? format(dataObj, "HH:mm") : '',
+          const rowData = [
+            dataObj ? format(dataObj, "dd/MM/yyyy") : service.dataInicio || '—',
+            dataObj ? format(dataObj, "HH:mm") : service.hrServico || '—',
             service.localSaida || '—',
-            motoristaFormatado, // Usando o nome formatado
+            motoristaFormatado,
             tipoCarroFormatado,
             formatCurrency(service.valorFinal || 0),
           ];
