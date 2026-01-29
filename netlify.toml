@@ -1,0 +1,13 @@
+[build]
+  command = "npm install && npm run build"
+  functions = "functions"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20.11.1"
+  NODE_ENV = "production"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
