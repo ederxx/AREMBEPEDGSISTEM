@@ -1,12 +1,11 @@
 [build]
-  command = "npm ci --prefer-offline --no-audit && npm run build"
+  command = "npm ci --include=dev --prefer-offline --no-audit && npm run build"
   functions = "functions"
   publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20.11.1"
   NODE_ENV = "production"
-  NPM_FLAGS = "--legacy-peer-deps"
 
 [[redirects]]
   from = "/*"
