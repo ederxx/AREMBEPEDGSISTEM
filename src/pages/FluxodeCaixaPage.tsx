@@ -65,7 +65,7 @@ const FluxoDeCaixaMaster = () => {
         list.push({
           id: s.id,
           date: s.dataInicio, // Usando data de início como referência
-          description: `Serviço: ${s.nomeEmpresa}`,
+          description: s.nomeEmpresa,
           value: Number(s.valorFinal) || 0,
           type: 'receita',
           category: s.tipoCarro || 'Serviço',
@@ -167,9 +167,9 @@ const FluxoDeCaixaMaster = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Despesa</TableHead>
+                <TableHead>Despesa/Empresa</TableHead>
                 <TableHead>Data</TableHead>
-                <TableHead>Categoria</TableHead>
+                <TableHead>Categoria/Receita</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
               </TableRow>
             </TableHeader>
@@ -177,17 +177,12 @@ const FluxoDeCaixaMaster = () => {
               {transactions.map((t) => (
                 <TableRow key={t.id}>
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span>{t.description}</span>
-                      <Badge variant="outline" className="w-fit text-[10px] uppercase">
-                        {t.type}
-                      </Badge>
-                    </div>
+                    <span>{t.description}</span>
                   </TableCell>
                   <TableCell className="font-medium">
                     {format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR })}
                   </TableCell>
-                  <TableCell>{t.category}</TableCell>
+                  <TableCell>{t.type === 'receita' ? 'Receita' : t.category}</TableCell>
                   <TableCell className={`text-right font-bold ${t.type === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
                     {t.type === 'receita' ? '+' : '-'} {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </TableCell>
