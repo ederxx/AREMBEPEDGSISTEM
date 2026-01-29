@@ -1,247 +1,211 @@
-import React, { useMemo, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { format, parseISO, isBefore, isAfter } from 'date-fns';
+import React, { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+import { useAuth } from '@/hooks/useAuth';
+import { useYear } from '@/contexts/YearContext';
+import { getYearCollection } from '../ultils/getYearCollection';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
+import { TrendingUp, TrendingDown, DollarSign, ArrowLeft } from 'lucide-react';
 
 /* =========================
-   TIPOS
+   TIPOS UNIFICADOS
 ========================= */
-export interface Transaction {
+interface UnifiedTransaction {
   id: string;
   date: string;
-  type: 'receita' | 'despesa';
   description: string;
   value: number;
+  type: 'receita' | 'despesa';
+  category: string;
   status: string;
-  empresa?: string;
-  banco?: string;
-  nome: string;
-  formadePagamento?: string;
 }
 
-interface Props {
-  transactions: Transaction[];
-  isLoading: boolean;
-}
-interface FluxoDeCaixaProps {
-  transactions?: Transaction[];
-  isLoading: boolean;
-}
-/* =========================
-   COMPONENTE
-========================= */
-const FluxoDeCaixa = ({ transactions = [], isLoading }: FluxoDeCaixaProps) => {
+const FluxoDeCaixaMaster = () => {
+  const { user } = useAuth();
+  const { year } = useYear();
   const navigate = useNavigate();
 
-  const [filterYear, setFilterYear] = useState<'all' | string>('all');
-  const [filterType, setFilterType] =
-    useState<'all' | 'receita' | 'despesa'>('all');
-  const [filterEmpresa, setFilterEmpresa] =
-    useState<'all' | 'Arembepe' | 'DG'>('all');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  // 1. Buscar Receitas (Services)
+  const { data: services = [], isLoading: loadingServices } = useQuery({
+    queryKey: ['services-flow', year],
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, getYearCollection('services', year)));
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+    enabled: !!user
+  });
+
+  // 2. Buscar Despesas (Expenses)
+  const { data: expenses = [], isLoading: loadingExpenses } = useQuery({
+    queryKey: ['expenses-flow', year],
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, getYearCollection('expenses', year)));
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+    enabled: !!user
+  });
 
   /* =========================
-     ANOS DISPONÍVEIS
+     LÓGICA DE UNIFICAÇÃO (SÓ O QUE ESTÁ PAGO)
   ========================= */
-  const availableYears = useMemo(() => {
-    const years = new Set<string>();
+  const { transactions, totalReceitas, totalDespesas, saldoFinal } = useMemo(() => {
+    const list: UnifiedTransaction[] = [];
 
-(transactions || []).forEach(t => {
-
-      if (t.date) {
-        years.add(parseISO(t.date).getFullYear().toString());
+    // Processar Receitas Pagas
+    services.forEach((s: any) => {
+      if (s.formadePagamento === 'pago') {
+        list.push({
+          id: s.id,
+          date: s.dataInicio, // Usando data de início como referência
+          description: `Serviço: ${s.nomeEmpresa}`,
+          value: Number(s.valorFinal) || 0,
+          type: 'receita',
+          category: s.tipoCarro || 'Serviço',
+          status: 'pago'
+        });
       }
     });
 
-    return Array.from(years).sort((a, b) => Number(b) - Number(a));
-  }, [transactions]);
-
-  /* =========================
-     FILTRO CORRIGIDO
-  ========================= */
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
-      if (!t.date) return false;
-
-      const dateObj = parseISO(t.date);
-      if (isNaN(dateObj.getTime())) return false;
-
-      // ✅ FILTRO DE ANO (CORRIGIDO)
-      if (filterYear !== 'all') {
-        const year = dateObj.getFullYear().toString();
-        if (year !== filterYear) return false;
+    // Processar Despesas Pagas
+    expenses.forEach((e: any) => {
+      if (e.dataPagamento) {
+        list.push({
+          id: e.id,
+          date: e.dataPagamento, // Data real que saiu o dinheiro
+          description: e.descricao || e.subcategoria,
+          value: Number(e.valor) || 0,
+          type: 'despesa',
+          category: e.categoria || 'Geral',
+          status: 'pago'
+        });
       }
-
-      // 🔥 regra: receita faturada não entra
-      if (t.type === 'receita' && t.formadePagamento === 'faturado') {
-        return false;
-      }
-
-      if (filterType !== 'all' && t.type !== filterType) return false;
-
-      if (
-        filterEmpresa !== 'all' &&
-        t.empresa?.toLowerCase() !== filterEmpresa.toLowerCase()
-      ) {
-        return false;
-      }
-
-      if (startDate && isBefore(dateObj, parseISO(startDate))) return false;
-      if (endDate && isAfter(dateObj, parseISO(endDate))) return false;
-
-      return true;
     });
-  }, [transactions, filterYear, filterType, filterEmpresa, startDate, endDate]);
 
-  /* =========================
-     SALDO ACUMULADO
-  ========================= */
-  const transacoesComSaldo = useMemo(() => {
-    let saldo = 0;
-    return filteredTransactions.map(t => {
-      saldo += t.type === 'receita' ? t.value : -t.value;
-      return { ...t, saldoAcumulado: saldo };
-    });
-  }, [filteredTransactions]);
+    // Ordenar por data (mais recente primeiro)
+    const sorted = list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const totalReceita = filteredTransactions
-    .filter(t => t.type === 'receita')
-    .reduce((sum, t) => sum + t.value, 0);
+    const receitas = list.filter(t => t.type === 'receita').reduce((acc, t) => acc + t.value, 0);
+    const despesas = list.filter(t => t.type === 'despesa').reduce((acc, t) => acc + t.value, 0);
 
-  const totalDespesa = filteredTransactions
-    .filter(t => t.type === 'despesa')
-    .reduce((sum, t) => sum + t.value, 0);
+    return {
+      transactions: sorted,
+      totalReceitas: receitas,
+      totalDespesas: despesas,
+      saldoFinal: receitas - despesas
+    };
+  }, [services, expenses]);
 
-  const saldoFinal = totalReceita - totalDespesa;
-
-  if (isLoading) {
-    return <div className="p-6">Carregando...</div>;
+  if (loadingServices || loadingExpenses) {
+    return <div className="p-8 text-center">Carregando Fluxo de Caixa...</div>;
   }
-if (isLoading || !transactions) {
-  return (
-    <Card>
-      <CardContent className="p-6 text-center">
-        Carregando dados...
-      </CardContent>
-    </Card>
-  );
-}
-  return (
-    <div className="space-y-6">
-      <Button variant="outline" onClick={() => navigate('/dashboard')}>
-        Voltar
-      </Button>
 
-      {/* RESUMO */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="bg-green-50">
-          <CardHeader>
-            <CardTitle>Receitas</CardTitle>
+  return (
+    <div className="container mx-auto p-6 space-y-8">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Fluxo de Caixa Realizado</h1>
+          <p className="text-muted-foreground">Baseado em pagamentos e recebimentos confirmados ({year}).</p>
+        </div>
+        <Button variant="outline" onClick={() => navigate('/dashboard')}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+        </Button>
+      </div>
+
+      {/* CARDS DE RESUMO */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-l-4 border-l-green-500">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Receitas Realizadas</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            R$ {totalReceita.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <div className="text-2xl font-bold text-green-600">
+              {totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-red-50">
-          <CardHeader>
-            <CardTitle>Despesas</CardTitle>
+        <Card className="border-l-4 border-l-red-500">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Despesas Pagas</CardTitle>
+            <TrendingDown className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            R$ {totalDespesa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <div className="text-2xl font-bold text-red-600">
+              {totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Saldo</CardTitle>
+        <Card className={`border-l-4 ${saldoFinal >= 0 ? 'border-l-blue-500' : 'border-l-orange-500'}`}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Saldo em Caixa</CardTitle>
+            <DollarSign className="h-4 w-4 text-blue-500" />
           </CardHeader>
-          <CardContent
-            className={saldoFinal >= 0 ? 'text-green-600' : 'text-red-600'}
-          >
-            R$ {saldoFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          <CardContent>
+            <div className={`text-2xl font-bold ${saldoFinal >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+              {saldoFinal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* FILTROS */}
+      {/* TABELA DE MOVIMENTAÇÃO */}
       <Card>
-        <CardContent className="grid grid-cols-4 gap-4">
-          <div>
-            <Label>Ano</Label>
-            <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {availableYears.map(y => (
-                  <SelectItem key={y} value={y}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <CardHeader>
+          <CardTitle>Extrato Detalhado</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Descrição</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transactions.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell className="font-medium">
+                    {format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR })}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span>{t.description}</span>
+                      <Badge variant="outline" className="w-fit text-[10px] uppercase">
+                        {t.type}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>{t.category}</TableCell>
+                  <TableCell className={`text-right font-bold ${t.type === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
+                    {t.type === 'receita' ? '+' : '-'} {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {transactions.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                    Nenhuma movimentação financeira encontrada para este período.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
-
-      {/* TABELA */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Data</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>Descrição</TableHead>
-            <TableHead className="text-right">Valor</TableHead>
-            <TableHead className="text-right">Saldo</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {transacoesComSaldo.map(t => (
-            <TableRow key={t.id}>
-              <TableCell>
-                {format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR })}
-              </TableCell>
-              <TableCell>{t.type}</TableCell>
-              <TableCell>{t.description}</TableCell>
-              <TableCell className="text-right">
-                R$ {t.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </TableCell>
-              <TableCell className="text-right">
-                R$ {t.saldoAcumulado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
     </div>
   );
 };
 
-export default FluxoDeCaixa;
+export default FluxoDeCaixaMaster;
