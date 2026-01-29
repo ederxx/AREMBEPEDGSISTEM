@@ -88,7 +88,7 @@ const FluxoDeCaixaMaster = () => {
         list.push({
           id: e.id,
           date: e.dataPagamento, // Data real que saiu o dinheiro
-          description: e.nome || 'Sem nome',
+          description: e.nome || e.subcategoria || 'Sem nome',
           value: Number(e.valor) || 0,
           type: 'despesa',
           category: e.categoria || 'Geral',
