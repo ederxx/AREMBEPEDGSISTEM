@@ -256,8 +256,8 @@ const FluxoDeCaixaMaster = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
-                <TableHead>Serviço/Descrição</TableHead>
                 <TableHead>Empresa/Categoria</TableHead>
+                <TableHead>Serviço/Descriminação</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
               </TableRow>
             </TableHeader>
@@ -272,7 +272,7 @@ const FluxoDeCaixaMaster = () => {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <span>{t.type === 'receita' ? t.category : t.description}</span>
+                      <span>{t.type === 'receita' ? t.description : t.category}</span>
                       <Badge
                         variant="outline"
                         className={`w-fit text-[10px] uppercase ${t.type === 'receita' ? 'text-green-700 border-green-300' : 'text-red-700 border-red-300'}`}
@@ -281,7 +281,7 @@ const FluxoDeCaixaMaster = () => {
                       </Badge>
                     </div>
                   </TableCell>
-                  <TableCell>{t.type === 'receita' ? t.description : t.category}</TableCell>
+                  <TableCell>{t.type === 'receita' ? t.category : t.description}</TableCell>
                   <TableCell className={`text-right font-bold ${t.type === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
                     {t.type === 'receita' ? '+' : '-'} {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </TableCell>
