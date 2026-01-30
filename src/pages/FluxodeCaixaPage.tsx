@@ -255,9 +255,9 @@ const FluxoDeCaixaMaster = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Despesa/Empresa</TableHead>
                 <TableHead>Data</TableHead>
-                <TableHead>Categoria/Receita</TableHead>
+                <TableHead>Serviço/Descrição</TableHead>
+                <TableHead>Empresa/Categoria</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
               </TableRow>
             </TableHeader>
@@ -267,9 +267,12 @@ const FluxoDeCaixaMaster = () => {
                   key={t.id}
                   className={t.type === 'receita' ? 'bg-green-50/60' : 'bg-red-50/60'}
                 >
+                  <TableCell className="font-medium">
+                    {format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR })}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <span>{t.description}</span>
+                      <span>{t.type === 'receita' ? t.category : t.description}</span>
                       <Badge
                         variant="outline"
                         className={`w-fit text-[10px] uppercase ${t.type === 'receita' ? 'text-green-700 border-green-300' : 'text-red-700 border-red-300'}`}
@@ -278,10 +281,7 @@ const FluxoDeCaixaMaster = () => {
                       </Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">
-                    {format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR })}
-                  </TableCell>
-                  <TableCell>{t.type === 'receita' ? 'Receita' : t.category}</TableCell>
+                  <TableCell>{t.type === 'receita' ? t.description : t.category}</TableCell>
                   <TableCell className={`text-right font-bold ${t.type === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
                     {t.type === 'receita' ? '+' : '-'} {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </TableCell>
