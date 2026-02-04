@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
@@ -24,6 +25,7 @@ interface UnifiedTransaction {
   id: string;
   date: string;
   description: string;
+  companyName: string;
   value: number;
   type: 'receita' | 'despesa';
   category: string;
@@ -74,6 +76,7 @@ const FluxoDeCaixaMaster = () => {
           id: s.id,
           date: s.dataInicio, // Usando data de início como referência
           description: s.localSaida || s.nomeEmpresa || 'Sem local de saída',
+          companyName: s.nomeEmpresa || 'Sem empresa',
           value: Number(s.valorFinal) || 0,
           type: 'receita',
           category: s.tipoCarro || 'Serviço',
@@ -89,6 +92,7 @@ const FluxoDeCaixaMaster = () => {
           id: e.id,
           date: e.dataPagamento, // Data real que saiu o dinheiro
           description: e.nome || e.subcategoria || 'Sem nome',
+          companyName: e.empresa || 'Sem empresa',
           value: Number(e.valor) || 0,
           type: 'despesa',
           category: e.categoria || 'Geral',
@@ -122,7 +126,7 @@ const FluxoDeCaixaMaster = () => {
       if (typeFilter !== 'all' && t.type !== typeFilter) return false;
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
       if (searchText) {
-        const hay = `${t.description} ${t.category}`.toLowerCase();
+        const hay = `${t.description} ${t.category} ${t.companyName}`.toLowerCase();
         if (!hay.includes(searchText.toLowerCase())) return false;
       }
       if (startDate && new Date(t.date) < new Date(startDate)) return false;
@@ -130,6 +134,30 @@ const FluxoDeCaixaMaster = () => {
       return true;
     });
   }, [transactions, typeFilter, categoryFilter, searchText, startDate, endDate]);
+
+  const handleExportExcel = () => {
+    const baseRows = filteredTransactions.map(t => ({
+      Data: format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR }),
+      Nome: t.description,
+      Empresa: t.companyName,
+      Categoria: t.category,
+      Tipo: t.type,
+      Valor: t.value
+    }));
+
+    const receitas = baseRows.filter(r => r.Tipo === 'receita');
+    const despesas = baseRows.filter(r => r.Tipo === 'despesa');
+
+    const wb = XLSX.utils.book_new();
+    const receitasSheet = XLSX.utils.json_to_sheet(receitas);
+    const despesasSheet = XLSX.utils.json_to_sheet(despesas);
+
+    XLSX.utils.book_append_sheet(wb, receitasSheet, 'Receitas');
+    XLSX.utils.book_append_sheet(wb, despesasSheet, 'Despesas');
+
+    const fileName = `fluxo-de-caixa-${year}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
 
   if (loadingServices || loadingExpenses) {
     return <div className="p-8 text-center">Carregando Fluxo de Caixa...</div>;
@@ -142,9 +170,14 @@ const FluxoDeCaixaMaster = () => {
           <h1 className="text-3xl font-bold tracking-tight">Fluxo de Caixa Realizado</h1>
           <p className="text-muted-foreground">Baseado em pagamentos e recebimentos confirmados ({year}).</p>
         </div>
-        <Button variant="outline" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="default" onClick={handleExportExcel}>
+            Exportar Excel
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/dashboard')}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+          </Button>
+        </div>
       </div>
 
       {/* CARDS DE RESUMO */}
@@ -256,8 +289,9 @@ const FluxoDeCaixaMaster = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Empresa</TableHead>
                 <TableHead>Empresa/Categoria</TableHead>
-                <TableHead>Serviço/Descriminação</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
               </TableRow>
             </TableHeader>
@@ -270,6 +304,10 @@ const FluxoDeCaixaMaster = () => {
                   <TableCell className="font-medium">
                     {format(parseISO(t.date), 'dd/MM/yyyy', { locale: ptBR })}
                   </TableCell>
+                  <TableCell>{t.description}</TableCell>
+                  <TableCell>
+                    {t.companyName}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span>{t.type === 'receita' ? t.description : t.category}</span>
@@ -281,7 +319,6 @@ const FluxoDeCaixaMaster = () => {
                       </Badge>
                     </div>
                   </TableCell>
-                  <TableCell>{t.type === 'receita' ? t.category : t.description}</TableCell>
                   <TableCell className={`text-right font-bold ${t.type === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
                     {t.type === 'receita' ? '+' : '-'} {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </TableCell>
@@ -289,7 +326,7 @@ const FluxoDeCaixaMaster = () => {
               ))}
               {filteredTransactions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
                     Nenhuma movimentação financeira encontrada para este período.
                   </TableCell>
                 </TableRow>
