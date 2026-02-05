@@ -12,7 +12,6 @@ import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
@@ -291,7 +290,6 @@ const FluxoDeCaixaMaster = () => {
                 <TableHead>Data</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Empresa</TableHead>
-                <TableHead>Empresa/Categoria</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
               </TableRow>
             </TableHeader>
@@ -308,17 +306,6 @@ const FluxoDeCaixaMaster = () => {
                   <TableCell>
                     {t.companyName}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span>{t.type === 'receita' ? t.description : t.category}</span>
-                      <Badge
-                        variant="outline"
-                        className={`w-fit text-[10px] uppercase ${t.type === 'receita' ? 'text-green-700 border-green-300' : 'text-red-700 border-red-300'}`}
-                      >
-                        {t.type}
-                      </Badge>
-                    </div>
-                  </TableCell>
                   <TableCell className={`text-right font-bold ${t.type === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
                     {t.type === 'receita' ? '+' : '-'} {t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </TableCell>
@@ -326,7 +313,7 @@ const FluxoDeCaixaMaster = () => {
               ))}
               {filteredTransactions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
                     Nenhuma movimentação financeira encontrada para este período.
                   </TableCell>
                 </TableRow>
